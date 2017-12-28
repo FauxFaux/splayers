@@ -10,8 +10,6 @@ pub enum FileType {
     Bz,
     Xz,
     Deb,
-    DiskImage,
-    Ext4,
     Other,
 }
 
@@ -77,15 +75,6 @@ impl FileType {
             && b'P' == header[0] && b'K' == header[1]
             && 0x03 == header[2] && 0x04 == header[3] {
             FileType::Zip
-        } else if header.len() > 257 + 10
-            && b'u' == header[257] && b's' == header[258]
-            && b't' == header[259] && b'a' == header[260]
-            && b'r' == header[261]
-            && (
-            (0 == header[262] && b'0' == header[263] && b'0' == header[264]) ||
-                (b' ' == header[262] && b' ' == header[263] && 0 == header[264])
-        ) {
-            FileType::Tar
         } else if header.len() > 70
             && header[0..DEB_PREFIX.len()] == DEB_PREFIX[..]
             && header[66..70] == b"`\n2."[..] {
@@ -102,14 +91,16 @@ impl FileType {
             && b'z' == header[2] && b'X' == header[3]
             && b'Z' == header[4] && 0 == header[5] {
             FileType::Xz
-        } else if is_probably_tar(header) {
+        } else if (header.len() > 257 + 10
+                && b'u' == header[257] && b's' == header[258]
+                && b't' == header[259] && b'a' == header[260]
+                && b'r' == header[261]
+                && (
+                (0 == header[262] && b'0' == header[263] && b'0' == header[264]) ||
+                    (b' ' == header[262] && b' ' == header[263] && 0 == header[264])
+                )
+            ) || is_probably_tar(header) {
             FileType::Tar
-        } else if header.len() > 512
-            && 0x55 == header[510] && 0xaa == header[511] {
-            FileType::DiskImage
-        } else if header.len() > 2048
-            && 0x53 == header[0x438] && 0xef == header[0x439] {
-            FileType::Ext4
         } else {
             FileType::Other
         }
