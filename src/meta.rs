@@ -154,7 +154,11 @@ pub fn zip(header: &zip::read::ZipFile) -> Result<Meta> {
         mtime: simple_time::simple_time_tm(header.last_modified()),
         ctime: 0,
         btime: 0,
-        item_type: ItemType::RegularFile,
+        item_type: if header.name_raw().ends_with(b"/") {
+            ItemType::Directory
+        } else {
+            ItemType::RegularFile
+        },
         ownership: if let Some(mode) = header.unix_mode() {
             Ownership::Posix {
                 user: None,
