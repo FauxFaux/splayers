@@ -16,7 +16,7 @@ pub struct Entry {
 
 #[derive(Debug)]
 pub struct LocalEntry {
-    pub temp: Stashed,
+    pub temp: Option<Stashed>,
     pub meta: meta::Meta,
     pub path: Box<[u8]>,
 }
@@ -32,7 +32,10 @@ pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> Result<Vec<Entry>> {
 
     Ok(kids.into_iter()
         .map(|local| Entry {
-            children: unpack_unknown(stash.open(local.temp), stash).map_err(|x| format!("{:?}", x)),
+            children: match local.temp {
+                Some(temp) => unpack_unknown(stash.open(temp), stash).map_err(|x| format!("{:?}", x)),
+                None => Err("empty file".to_string()),
+            },
             local,
         })
         .collect())
@@ -58,7 +61,7 @@ fn unpack_deb(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: stash.stash(entry.take(size))?,
+            temp: stash.stash_take(entry, size)?,
         });
     }
 
@@ -79,7 +82,7 @@ fn unpack_tar(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: stash.stash(tar.take(size))?,
+            temp: stash.stash_take(tar, size)?,
         });
     }
 
@@ -90,7 +93,7 @@ fn unpack_gz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     use flate2;
     let decoder = flate2::read::GzDecoder::new(from);
     let header = decoder.header().ok_or("invalid header")?.clone();
-    let temp = stash.stash(decoder)?;
+    let temp = Some(stash.stash(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -109,7 +112,7 @@ fn unpack_xz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     use xz2;
 
     let decoder = xz2::read::XzDecoder::new(from);
-    let temp = stash.stash(decoder)?;
+    let temp = Some(stash.stash(decoder)?);
 
     Ok(vec![
         LocalEntry {

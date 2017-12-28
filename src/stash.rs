@@ -46,6 +46,14 @@ impl Stash {
         Ok(stashed)
     }
 
+    pub fn stash_take<R: Read>(&mut self, mut from: R, size: u64) -> io::Result<Option<Stashed>> {
+        Ok(if 0 == size {
+            None
+        } else {
+            Some(self.stash(from.take(size))?)
+        })
+    }
+
     fn path_of(&self, item: Stashed) -> PathBuf {
         let mut dest = self.dir.as_ref().to_path_buf();
         dest.push(format!("{}.tmp", item.idx));
