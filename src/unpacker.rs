@@ -32,7 +32,7 @@ pub enum UnpackResult {
 }
 
 pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> UnpackResult {
-    match FileType::identify(&from.header()) {
+    match match FileType::identify(&from.header()) {
         FileType::Deb => unpack_deb(from, stash),
         FileType::Tar => unpack_tar(from, stash),
         FileType::Zip => unpack_zip(from, stash),
@@ -41,24 +41,14 @@ pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> UnpackResult {
         FileType::Empty => return UnpackResult::Unnecessary,
         FileType::Other => return UnpackResult::Unrecognised,
         other => return UnpackResult::Unsupported(other),
-    }.map(|kids| {
-        kids.into_iter()
-            .map(|local| Entry {
-                children: match local.temp {
-                    Some(temp) => {
-                        let val = unpack_unknown(stash.open(temp), stash);
-                        if val.fully_consumed() {
-                            stash.release(temp);
-                        }
-                        val
-                    }
-                    None => UnpackResult::Unnecessary,
-                },
-                local,
-            })
-            .collect()
-    })
-        .into()
+    } {
+        Ok(kids) => UnpackResult::Success(
+            kids.into_iter()
+                .map(|local| local.into_entry(stash))
+                .collect(),
+        ),
+        Err(e) => UnpackResult::Error(format!("{}", e)),
+    }
 }
 
 fn unpack_deb(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
@@ -166,20 +156,30 @@ fn unpack_xz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     ])
 }
 
+impl LocalEntry {
+    fn into_entry(self, stash: &mut Stash) -> Entry {
+        let children = if let Some(temp) = self.temp {
+            let val = unpack_unknown(stash.open(temp), stash);
+            if val.fully_consumed() {
+                stash.release(temp);
+            }
+            val
+        } else {
+            UnpackResult::Unnecessary
+        };
+
+        Entry {
+            children,
+            local: self,
+        }
+    }
+}
+
 impl UnpackResult {
     fn fully_consumed(&self) -> bool {
         match *self {
             UnpackResult::Success(ref v) if !v.is_empty() => true,
             _ => false,
-        }
-    }
-}
-
-impl From<Result<Vec<Entry>>> for UnpackResult {
-    fn from(val: Result<Vec<Entry>>) -> Self {
-        match val {
-            Ok(v) => UnpackResult::Success(v),
-            Err(e) => UnpackResult::Error(format!("{}", e)),
         }
     }
 }
