@@ -59,14 +59,6 @@ pub struct PosixEntity {
     pub name: String,
 }
 
-#[derive(Clone, Debug)]
-pub enum Container {
-    Unrecognised,
-    Included,
-    OpenError(String),
-    ReadError(String),
-}
-
 pub fn just_stream() -> Meta {
     Meta {
         atime: 0,
