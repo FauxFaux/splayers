@@ -24,9 +24,13 @@ pub struct Stash {
 impl Stash {
     pub fn new() -> io::Result<Self> {
         Ok(Stash {
-            dir: TempDir::new("splayers")?,
+            dir: TempDir::new(".splayers")?,
             idx: 0,
         })
+    }
+
+    pub fn into_path(self) -> PathBuf {
+        self.dir.into_path()
     }
 
     pub fn stash<R: Read>(&mut self, mut from: R) -> io::Result<Stashed> {

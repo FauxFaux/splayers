@@ -40,8 +40,7 @@ fn run() -> Result<()> {
         unpacker::UnpackResult::Success(ref entries) => print(&entries, 0)?,
         other => println!("couldn't process file at all: {:?}", other),
     }
-    println!("{:?}", stash);
-    ::std::process::exit(1);
+    println!("{:?}", stash.into_path());
     Ok(())
 }
 
@@ -58,7 +57,7 @@ fn print(entries: &[unpacker::Entry], depth: usize) -> Result<()> {
             println!();
             print(children, depth + 2)?;
         } else {
-            println!("{:?}", entry.children);
+            println!(" {:?}", entry.children);
         }
     }
     Ok(())
