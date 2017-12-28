@@ -36,6 +36,7 @@ pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> UnpackResult {
         FileType::Deb => unpack_deb(from, stash),
         FileType::Tar => unpack_tar(from, stash),
         FileType::Zip => unpack_zip(from, stash),
+        FileType::Bz => unpack_bz(from, stash),
         FileType::Gz => unpack_gz(from, stash),
         FileType::Xz => unpack_xz(from, stash),
         FileType::Empty => return UnpackResult::Unnecessary,
@@ -120,6 +121,21 @@ fn unpack_zip(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     }
 
     Ok(entries)
+}
+
+fn unpack_bz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
+    use bzip2;
+
+    let decoder = bzip2::read::BzDecoder::new(from);
+    let temp = Some(stash.stash(decoder)?);
+
+    Ok(vec![
+        LocalEntry {
+            temp,
+            meta: meta::just_stream(),
+            path: b"..bz2".to_vec().into_boxed_slice(),
+        },
+    ])
 }
 
 fn unpack_gz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {

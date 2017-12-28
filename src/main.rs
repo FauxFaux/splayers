@@ -1,4 +1,5 @@
 extern crate ar;
+extern crate bzip2;
 
 #[macro_use]
 extern crate error_chain;
