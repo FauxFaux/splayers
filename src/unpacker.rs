@@ -169,16 +169,19 @@ fn unpack_xz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
 }
 
 impl LocalEntry {
-    fn into_entry(self, stash: &mut Stash) -> Entry {
-        let children = if let Some(temp) = self.temp {
-            let val = unpack_unknown(stash.open(temp), stash);
-            if val.fully_consumed() {
-                stash.release(temp);
-            }
-            val
+    fn into_entry(mut self, stash: &mut Stash) -> Entry {
+        let children = if let Some(temp) = self.temp.as_ref() {
+            unpack_unknown(
+                Mio::from_path(temp.path()).expect("working with stash"),
+                stash,
+            )
         } else {
             UnpackResult::Unnecessary
         };
+
+        if children.fully_consumed() {
+            self.temp = None;
+        }
 
         Entry {
             children,

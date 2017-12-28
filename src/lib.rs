@@ -9,8 +9,7 @@ extern crate error_chain_for_dumb_ides;
 
 extern crate flate2;
 extern crate tar;
-extern crate tempdir;
-extern crate tempfile_fast;
+extern crate tempfile;
 extern crate time as crates_time;
 
 #[macro_use]
@@ -19,7 +18,7 @@ extern crate more_asserts;
 extern crate xz2;
 extern crate zip;
 
-use std::env;
+use std::path::Path;
 
 mod errors;
 mod filetype;
@@ -29,23 +28,18 @@ mod simple_time;
 mod stash;
 mod unpacker;
 
+pub use unpacker::UnpackResult;
 use errors::*;
 
-quick_main!(run);
-fn run() -> Result<()> {
+pub fn unpack<P: AsRef<Path>, F: AsRef<Path>>(root: P, what: F) -> Result<UnpackResult> {
     let mut stash = stash::Stash::new()?;
-    match unpacker::unpack_unknown(
-        mio::Mio::from_path(env::args().nth(1).expect("first argument: file"))?,
+    Ok(unpacker::unpack_unknown(
+        mio::Mio::from_path(what)?,
         &mut stash,
-    ) {
-        unpacker::UnpackResult::Success(ref entries) => print(entries, 0)?,
-        other => println!("couldn't process file at all: {:?}", other),
-    }
-    println!("{:?}", stash.into_path());
-    Ok(())
+    ))
 }
 
-fn print(entries: &[unpacker::Entry], depth: usize) -> Result<()> {
+pub fn print(entries: &[unpacker::Entry], depth: usize) {
     for entry in entries {
         print!(
             "{} - {:?} at {:?}:",
@@ -56,10 +50,9 @@ fn print(entries: &[unpacker::Entry], depth: usize) -> Result<()> {
 
         if let unpacker::UnpackResult::Success(ref children) = entry.children {
             println!();
-            print(children, depth + 2)?;
+            print(children, depth + 2);
         } else {
             println!(" {:?}", entry.children);
         }
     }
-    Ok(())
 }

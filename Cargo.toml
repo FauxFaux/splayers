@@ -6,8 +6,7 @@ version = "0.1.0"
 [dependencies]
 error-chain = "0.11"
 more-asserts = "0.1"
-tempdir = "0.3"
-tempfile-fast = "0.1"
+tempfile = "2"
 time = "0.1"
 
 #formats

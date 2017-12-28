@@ -1,39 +1,40 @@
-use std::fs;
+use std::fmt;
 use std::io;
 use std::io::Read;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 
-use tempdir::TempDir;
-use tempfile_fast::persistable_tempfile_in;
+use tempfile::NamedTempFile;
 
-use mio::Mio;
-
-#[derive(Debug, Copy, Clone)]
 pub struct Stashed {
-    idx: u64,
+    inner: NamedTempFile,
 }
 
 #[derive(Debug)]
 pub struct Stash {
-    dir: TempDir,
-    idx: u64,
+    dir: PathBuf,
+}
+
+impl Stashed {
+    pub fn path(&self) -> &Path {
+        self.inner.path()
+    }
+}
+
+impl fmt::Debug for Stashed {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "Stashed {{ {:?} }}", self.path())
+    }
 }
 
 impl Stash {
     pub fn new() -> io::Result<Self> {
-        Ok(Stash {
-            dir: TempDir::new(".splayers")?,
-            idx: 0,
-        })
-    }
-
-    pub fn into_path(self) -> PathBuf {
-        self.dir.into_path()
+        Ok(Stash { dir: "/tmp".into() })
     }
 
     pub fn stash<R: Read>(&mut self, mut from: R) -> io::Result<Stashed> {
-        let mut tmp = persistable_tempfile_in(&self.dir).expect("creating temp file");
+        let mut tmp = NamedTempFile::new_in(&self.dir).expect("creating temp file");
         loop {
             let mut buf = [0u8; 8 * 1024];
             let found = from.read(&mut buf)?;
@@ -43,11 +44,7 @@ impl Stash {
             tmp.write_all(&buf[..found]).expect("writing to temp file");
         }
 
-        self.idx += 1;
-        let stashed = Stashed { idx: self.idx };
-        tmp.persist_noclobber(self.path_of(stashed))
-            .expect("persisting temp file");
-        Ok(stashed)
+        Ok(Stashed { inner: tmp })
     }
 
     pub fn stash_take<R: Read>(&mut self, from: R, size: u64) -> io::Result<Option<Stashed>> {
@@ -56,20 +53,5 @@ impl Stash {
         } else {
             Some(self.stash(from.take(size))?)
         })
-    }
-
-    fn path_of(&self, item: Stashed) -> PathBuf {
-        let mut dest = self.dir.as_ref().to_path_buf();
-        dest.push(format!("{}.tmp", item.idx));
-        dest
-    }
-
-    pub fn open(&self, item: Stashed) -> Mio {
-        assert!(item.idx <= self.idx, "can't be a valid idx");
-        Mio::from_path(self.path_of(item)).expect("working with stash")
-    }
-
-    pub fn release(&self, item: Stashed) {
-        fs::remove_file(self.path_of(item)).expect("unlinking temp file")
     }
 }
