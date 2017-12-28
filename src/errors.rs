@@ -1,19 +1,11 @@
-use std;
-use std::error;
-use std::io;
-
-#[cfg(never)]
-use ext4;
-use zip;
-
 error_chain! {
     links {
-        Ext4(::ext4::Error, ::ext4::ErrorKind) #[cfg(never)];
+        Ext4(::ext4::Error, ::ext4::ErrorKind);
     }
 
     foreign_links {
-        Io(io::Error);
-        Zip(zip::result::ZipError);
+        Io(::std::io::Error);
+        Zip(::zip::result::ZipError);
     }
 
 }

@@ -1,8 +1,10 @@
 extern crate ar;
+extern crate bootsector;
 extern crate bzip2;
 
 #[macro_use]
 extern crate error_chain;
+extern crate ext4;
 
 #[cfg(intellij_type_hinting)]
 extern crate error_chain_for_dumb_ides;
