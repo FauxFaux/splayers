@@ -1,0 +1,24 @@
+[package]
+authors = ["Chris West (Faux) <git@goeswhere.com>"]
+name = "splayers"
+version = "0.1.0"
+
+[dependencies]
+error-chain = "0.11"
+more-asserts = "0.1"
+tempdir = "0.3"
+tempfile-fast = "0.1"
+
+#formats
+ar = "0.4"
+bootsector = "0.1"
+bzip2 = "0.3"
+ext4 = "0.4"
+flate2 = "1"
+tar = "0.4"
+xz2 = { git = "https://github.com/alexcrichton/xz2-rs", rev = "7458dd89fd504be344b39db451ca6361b3ac9ae2" }
+zip = "0.2"
+
+
+[dev-dependencies.error-chain-for-dumb-ides]
+git = "https://github.com/FauxFaux/error-chain-for-dumb-ides"
