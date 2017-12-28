@@ -9,9 +9,10 @@ use stash::Stashed;
 
 use std::io::Read;
 
+#[derive(Debug)]
 pub struct Entry {
     pub local: LocalEntry,
-    pub children: ::std::result::Result<Vec<Entry>, String>,
+    pub children: UnpackResult,
 }
 
 #[derive(Debug)]
@@ -21,31 +22,43 @@ pub struct LocalEntry {
     pub path: Box<[u8]>,
 }
 
-pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> Result<Vec<Entry>> {
-    let kids = match FileType::identify(&from.header()?) {
-        FileType::Deb => unpack_deb(from, stash)?,
-        FileType::Tar => unpack_tar(from, stash)?,
-        FileType::Zip => unpack_zip(from, stash)?,
-        FileType::Gz => unpack_gz(from, stash)?,
-        FileType::Xz => unpack_xz(from, stash)?,
-        other => bail!("unrecognised file type: {:?}", other),
-    };
+#[derive(Debug)]
+pub enum UnpackResult {
+    Unnecessary,
+    Unrecognised,
+    Unsupported(FileType),
+    Error(String),
+    Success(Vec<Entry>),
+}
 
-    Ok(kids.into_iter()
-        .map(|local| Entry {
-            children: match local.temp {
-                Some(temp) => match unpack_unknown(stash.open(temp), stash) {
-                    Ok(children) => {
-                        stash.release(temp);
-                        Ok(children)
+pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> UnpackResult {
+    match FileType::identify(&from.header()) {
+        FileType::Deb => unpack_deb(from, stash),
+        FileType::Tar => unpack_tar(from, stash),
+        FileType::Zip => unpack_zip(from, stash),
+        FileType::Gz => unpack_gz(from, stash),
+        FileType::Xz => unpack_xz(from, stash),
+        FileType::Empty => return UnpackResult::Unnecessary,
+        FileType::Other => return UnpackResult::Unrecognised,
+        other => return UnpackResult::Unsupported(other),
+    }.map(|kids| {
+        kids.into_iter()
+            .map(|local| Entry {
+                children: match local.temp {
+                    Some(temp) => {
+                        let val = unpack_unknown(stash.open(temp), stash);
+                        if val.fully_consumed() {
+                            stash.release(temp);
+                        }
+                        val
                     }
-                    Err(e) => Err(format!("{:?}", e)),
+                    None => UnpackResult::Unnecessary,
                 },
-                None => Err("empty file".to_string()),
-            },
-            local,
-        })
-        .collect())
+                local,
+            })
+            .collect()
+    })
+        .into()
 }
 
 fn unpack_deb(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
@@ -151,4 +164,22 @@ fn unpack_xz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
             path: b"..xz".to_vec().into_boxed_slice(),
         },
     ])
+}
+
+impl UnpackResult {
+    fn fully_consumed(&self) -> bool {
+        match *self {
+            UnpackResult::Success(ref v) if !v.is_empty() => true,
+            _ => false,
+        }
+    }
+}
+
+impl From<Result<Vec<Entry>>> for UnpackResult {
+    fn from(val: Result<Vec<Entry>>) -> Self {
+        match val {
+            Ok(v) => UnpackResult::Success(v),
+            Err(e) => UnpackResult::Error(format!("{}", e)),
+        }
+    }
 }

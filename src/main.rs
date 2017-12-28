@@ -33,13 +33,13 @@ use errors::*;
 quick_main!(run);
 fn run() -> Result<()> {
     let mut stash = stash::Stash::new()?;
-    print(
-        &unpacker::unpack_unknown(
-            mio::Mio::from_path(env::args().nth(1).expect("first argument: file"))?,
-            &mut stash,
-        )?,
-        0,
-    )?;
+    match unpacker::unpack_unknown(
+        mio::Mio::from_path(env::args().nth(1).expect("first argument: file"))?,
+        &mut stash,
+    ) {
+        unpacker::UnpackResult::Success(ref entries) => print(&entries, 0)?,
+        other => println!("couldn't process file at all: {:?}", other),
+    }
     println!("{:?}", stash);
     ::std::process::exit(1);
     Ok(())
@@ -54,12 +54,11 @@ fn print(entries: &[unpacker::Entry], depth: usize) -> Result<()> {
             entry.local.temp
         );
 
-        match entry.children.as_ref() {
-            Err(msg) => println!(" {}", msg),
-            Ok(children) => {
-                println!();
-                print(children, depth + 2)?;
-            }
+        if let unpacker::UnpackResult::Success(ref children) = entry.children {
+            println!();
+            print(children, depth + 2)?;
+        } else {
+            println!("{:?}", entry.children);
         }
     }
     Ok(())
