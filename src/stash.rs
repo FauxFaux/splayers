@@ -1,40 +1,40 @@
 use std::fmt;
+use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
-use tempfile::NamedTempFile;
+use tempdir::TempDir;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Stashed {
-    inner: NamedTempFile,
+    idx: usize,
 }
 
 #[derive(Debug)]
 pub struct Stash {
-    dir: PathBuf,
-}
-
-impl Stashed {
-    pub fn path(&self) -> &Path {
-        self.inner.path()
-    }
-}
-
-impl fmt::Debug for Stashed {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Stashed {{ {:?} }}", self.path())
-    }
+    dir: TempDir,
+    len: usize,
 }
 
 impl Stash {
     pub fn new() -> io::Result<Self> {
-        Ok(Stash { dir: "/tmp".into() })
+        Ok(Stash {
+            dir: TempDir::new(".splayed")?,
+            len: 0,
+        })
     }
 
-    pub fn stash<R: Read>(&mut self, mut from: R) -> io::Result<Stashed> {
-        let mut tmp = NamedTempFile::new_in(&self.dir).expect("creating temp file");
+    pub fn insert<R: Read>(&mut self, mut from: R) -> io::Result<Stashed> {
+        let item = Stashed { idx: self.len };
+        self.len += 1;
+
+        let mut tmp = fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(self.path_of(item))?;
         loop {
             let mut buf = [0u8; 8 * 1024];
             let found = from.read(&mut buf)?;
@@ -44,14 +44,20 @@ impl Stash {
             tmp.write_all(&buf[..found]).expect("writing to temp file");
         }
 
-        Ok(Stashed { inner: tmp })
+        Ok(item)
     }
 
-    pub fn stash_take<R: Read>(&mut self, from: R, size: u64) -> io::Result<Option<Stashed>> {
+    pub fn push_take<R: Read>(&mut self, from: R, size: u64) -> io::Result<Option<Stashed>> {
         Ok(if 0 == size {
             None
         } else {
-            Some(self.stash(from.take(size))?)
+            Some(self.insert(from.take(size))?)
         })
+    }
+
+    pub fn path_of(&self, item: Stashed) -> PathBuf {
+        let mut dest = self.dir.as_ref().to_path_buf();
+        dest.push(format!(".{}.tmp", item.idx));
+        dest
     }
 }

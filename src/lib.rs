@@ -9,7 +9,7 @@ extern crate error_chain_for_dumb_ides;
 
 extern crate flate2;
 extern crate tar;
-extern crate tempfile;
+extern crate tempdir;
 extern crate time as crates_time;
 
 #[macro_use]

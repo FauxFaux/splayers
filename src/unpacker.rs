@@ -68,7 +68,7 @@ fn unpack_deb(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: stash.stash_take(entry, size)?,
+            temp: stash.push_take(entry, size)?,
         });
     }
 
@@ -89,7 +89,7 @@ fn unpack_tar(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: stash.stash_take(tar, size)?,
+            temp: stash.push_take(tar, size)?,
         });
     }
 
@@ -112,7 +112,7 @@ fn unpack_zip(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: stash.stash_take(entry, size)?,
+            temp: stash.push_take(entry, size)?,
         });
     }
 
@@ -123,7 +123,7 @@ fn unpack_bz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     use bzip2;
 
     let decoder = bzip2::read::BzDecoder::new(from);
-    let temp = Some(stash.stash(decoder)?);
+    let temp = Some(stash.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -138,7 +138,7 @@ fn unpack_gz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     use flate2;
     let decoder = flate2::read::GzDecoder::new(from);
     let header = decoder.header().ok_or("invalid header")?.clone();
-    let temp = Some(stash.stash(decoder)?);
+    let temp = Some(stash.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -157,7 +157,7 @@ fn unpack_xz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     use xz2;
 
     let decoder = xz2::read::XzDecoder::new(from);
-    let temp = Some(stash.stash(decoder)?);
+    let temp = Some(stash.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -172,7 +172,7 @@ impl LocalEntry {
     fn into_entry(mut self, stash: &mut Stash) -> Entry {
         let children = if let Some(temp) = self.temp.as_ref() {
             unpack_unknown(
-                Mio::from_path(temp.path()).expect("working with stash"),
+                Mio::from_path(stash.path_of(*temp)).expect("working with stash"),
                 stash,
             )
         } else {
