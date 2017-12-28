@@ -33,7 +33,13 @@ pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> Result<Vec<Entry>> {
     Ok(kids.into_iter()
         .map(|local| Entry {
             children: match local.temp {
-                Some(temp) => unpack_unknown(stash.open(temp), stash).map_err(|x| format!("{:?}", x)),
+                Some(temp) => match unpack_unknown(stash.open(temp), stash) {
+                    Ok(children) => {
+                        stash.release(temp);
+                        Ok(children)
+                    },
+                    Err(e) => Err(format!("{:?}", e)),
+                }
                 None => Err("empty file".to_string()),
             },
             local,

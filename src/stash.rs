@@ -1,3 +1,4 @@
+use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
@@ -63,5 +64,9 @@ impl Stash {
     pub fn open(&self, item: Stashed) -> Mio {
         assert!(item.idx <= self.idx, "can't be a valid idx");
         Mio::from_path(self.path_of(item)).expect("working with stash")
+    }
+
+    pub fn release(&self, item: Stashed) {
+       fs::remove_file(self.path_of(item)).expect("unlinking temp file")
     }
 }
