@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use ar;
 use flate2;
 use tar;
+use zip;
 
 use errors::*;
 use simple_time;
@@ -106,6 +107,18 @@ pub fn tar(header: &tar::Header) -> Result<Meta> {
     Ok(Meta {
         atime: 0,
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()?),
+        ctime: 0,
+        btime: 0,
+        item_type: ItemType::Unknown,
+        ownership: Ownership::Unknown,
+        xattrs: HashMap::new(),
+    })
+}
+
+pub fn zip(header: &zip::read::ZipFile) -> Result<Meta> {
+    Ok(Meta {
+        atime: 0,
+        mtime: simple_time::simple_time_tm(header.last_modified()),
         ctime: 0,
         btime: 0,
         item_type: ItemType::Unknown,

@@ -67,6 +67,6 @@ impl Stash {
     }
 
     pub fn release(&self, item: Stashed) {
-       fs::remove_file(self.path_of(item)).expect("unlinking temp file")
+        fs::remove_file(self.path_of(item)).expect("unlinking temp file")
     }
 }

@@ -47,3 +47,10 @@ impl io::Read for Mio {
         }
     }
 }
+
+/// I don't think seek really fails because the filesystem is broken
+impl io::Seek for Mio {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.inner.seek(pos)
+    }
+}

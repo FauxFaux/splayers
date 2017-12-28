@@ -10,11 +10,13 @@ extern crate flate2;
 extern crate tar;
 extern crate tempdir;
 extern crate tempfile_fast;
+extern crate time as crates_time;
 
 #[macro_use]
 extern crate more_asserts;
 
 extern crate xz2;
+extern crate zip;
 
 use std::env;
 

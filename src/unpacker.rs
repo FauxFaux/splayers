@@ -25,6 +25,7 @@ pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> Result<Vec<Entry>> {
     let kids = match FileType::identify(&from.header()?) {
         FileType::Deb => unpack_deb(from, stash)?,
         FileType::Tar => unpack_tar(from, stash)?,
+        FileType::Zip => unpack_zip(from, stash)?,
         FileType::Gz => unpack_gz(from, stash)?,
         FileType::Xz => unpack_xz(from, stash)?,
         other => bail!("unrecognised file type: {:?}", other),
@@ -37,9 +38,9 @@ pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> Result<Vec<Entry>> {
                     Ok(children) => {
                         stash.release(temp);
                         Ok(children)
-                    },
+                    }
                     Err(e) => Err(format!("{:?}", e)),
-                }
+                },
                 None => Err("empty file".to_string()),
             },
             local,
@@ -89,6 +90,29 @@ fn unpack_tar(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
             meta,
             path,
             temp: stash.stash_take(tar, size)?,
+        });
+    }
+
+    Ok(entries)
+}
+
+fn unpack_zip(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
+    use zip;
+
+    let mut entries = Vec::new();
+
+    let mut archive = zip::read::ZipArchive::new(from)?;
+    for i in 0..archive.len() {
+        let entry = archive.by_index(i)?;
+
+        let size = entry.size();
+        let path = entry.name_raw().to_vec().into_boxed_slice();
+        let meta = meta::zip(&entry)?;
+
+        entries.push(LocalEntry {
+            meta,
+            path,
+            temp: stash.stash_take(entry, size)?,
         });
     }
 

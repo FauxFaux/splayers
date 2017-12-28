@@ -4,7 +4,6 @@ use std::io;
 
 #[cfg(never)]
 use ext4;
-#[cfg(never)]
 use zip;
 
 error_chain! {
@@ -14,7 +13,7 @@ error_chain! {
 
     foreign_links {
         Io(io::Error);
-        Zip(zip::result::ZipError) #[cfg(never)];
+        Zip(zip::result::ZipError);
     }
 
 }

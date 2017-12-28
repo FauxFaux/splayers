@@ -2,7 +2,6 @@ use std::fs;
 use std::io;
 use std::time;
 
-#[cfg(never)]
 use crates_time;
 #[cfg(never)]
 use ext4;
@@ -23,7 +22,6 @@ pub fn simple_time_sys(val: time::SystemTime) -> u64 {
         .unwrap_or(0)
 }
 
-#[cfg(never)]
 pub fn simple_time_tm(val: crates_time::Tm) -> u64 {
     let timespec = val.to_timespec();
     simple_time(time::Duration::new(
