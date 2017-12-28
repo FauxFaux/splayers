@@ -11,10 +11,7 @@ use simple_time;
 
 #[derive(Clone, Debug)]
 pub struct Meta {
-    pub atime: u64,
     pub mtime: u64,
-    pub ctime: u64,
-    pub btime: u64,
     pub item_type: ItemType,
     pub ownership: Ownership,
     pub xattrs: HashMap<String, Box<[u8]>>,
@@ -116,10 +113,7 @@ impl PosixEntity {
 
 pub fn just_stream() -> Meta {
     Meta {
-        atime: 0,
         mtime: 0,
-        ctime: 0,
-        btime: 0,
         item_type: ItemType::RegularFile,
         ownership: Ownership::Unknown,
         xattrs: HashMap::new(),
@@ -128,10 +122,7 @@ pub fn just_stream() -> Meta {
 
 pub fn ar(header: &ar::Header) -> Result<Meta> {
     Ok(Meta {
-        atime: 0,
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()),
-        ctime: 0,
-        btime: 0,
         item_type: ItemType::from_mode_lossy(header.mode()),
         ownership: Ownership::Posix {
             user: Some(PosixEntity::just_id(header.uid())),
@@ -144,10 +135,7 @@ pub fn ar(header: &ar::Header) -> Result<Meta> {
 
 pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
     Ok(Meta {
-        atime: 0,
         mtime: simple_time::simple_time_epoch_seconds(u64::from(header.mtime())),
-        ctime: 0,
-        btime: 0,
         item_type: ItemType::RegularFile,
         ownership: Ownership::Unknown,
         xattrs: HashMap::new(),
@@ -157,10 +145,7 @@ pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
 pub fn tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>) -> Result<Meta> {
     let mode = header.mode()?;
     Ok(Meta {
-        atime: 0,
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()?),
-        ctime: 0,
-        btime: 0,
         item_type: match RawItemType::from_mode_lossy(mode) {
             RawItemType::SymbolicLink => ItemType::SymbolicLink(
                 link_name_bytes
@@ -195,10 +180,7 @@ pub fn tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>) -> 
 
 pub fn zip(header: &zip::read::ZipFile) -> Result<Meta> {
     Ok(Meta {
-        atime: 0,
         mtime: simple_time::simple_time_tm(header.last_modified()),
-        ctime: 0,
-        btime: 0,
         item_type: if header.name_raw().ends_with(b"/") {
             ItemType::Directory
         } else {
