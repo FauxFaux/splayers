@@ -39,7 +39,6 @@ pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> UnpackResult {
         FileType::Bz => unpack_bz(from, stash),
         FileType::Gz => unpack_gz(from, stash),
         FileType::Xz => unpack_xz(from, stash),
-        FileType::DiskImage => unpack_disc(from, stash),
         FileType::Empty => return UnpackResult::Unnecessary,
         FileType::Other => return UnpackResult::Unrecognised,
         other => return UnpackResult::Unsupported(other),
@@ -171,25 +170,6 @@ fn unpack_xz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
             path: b"..xz".to_vec().into_boxed_slice(),
         },
     ])
-}
-
-fn unpack_disc(mut from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
-    use bootsector;
-    let mut ret = Vec::with_capacity(4);
-
-    for (id, partition) in bootsector::list_partitions(&mut from, &bootsector::Options::default())?
-        .into_iter()
-        .enumerate()
-    {
-        let temp = Some(stash.stash(bootsector::open_partition(&mut from, &partition)?)?);
-        ret.push(LocalEntry {
-            temp,
-            meta: meta::just_stream(),
-            path: format!("p{}", id).as_bytes().to_vec().into_boxed_slice(),
-        })
-    }
-
-    Ok(ret)
 }
 
 impl LocalEntry {

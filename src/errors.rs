@@ -1,8 +1,4 @@
 error_chain! {
-    links {
-        Ext4(::ext4::Error, ::ext4::ErrorKind);
-    }
-
     foreign_links {
         Io(::std::io::Error);
         Zip(::zip::result::ZipError);
