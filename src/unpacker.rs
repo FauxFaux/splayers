@@ -1,6 +1,7 @@
 use std::fmt;
 
 use meta;
+use meta::ItemType;
 use errors::*;
 use filetype::FileType;
 use mio::Mio;
@@ -88,7 +89,7 @@ fn unpack_tar(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         let tar = tar?;
         let size = tar.header().size()?;
         let path = tar.header().path_bytes().to_vec().into_boxed_slice();
-        let meta = meta::tar(tar.header())?;
+        let mut meta = meta::tar(tar.header(), tar.link_name_bytes())?;
 
         entries.push(LocalEntry {
             meta,

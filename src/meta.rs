@@ -1,3 +1,4 @@
+use std::borrow;
 use std::collections::HashMap;
 
 use ar;
@@ -28,9 +29,9 @@ pub enum ItemType {
     Fifo,
     Socket,
     /// A symlink, with its destination.
-    SymbolicLink(String),
+    SymbolicLink(Box<[u8]>),
     /// A hardlink, with its destination.
-    HardLink(String),
+    HardLink(Box<[u8]>),
     /// A 'c' device.
     CharacterDevice {
         major: u32,
@@ -41,6 +42,13 @@ pub enum ItemType {
         major: u32,
         minor: u32,
     },
+}
+
+enum RawItemType {
+    Sloppy,
+    SymbolicLink,
+    CharacterDevice,
+    BlockDevice,
 }
 
 #[derive(Clone, Debug)]
@@ -83,6 +91,18 @@ impl ItemType {
             S_IFIFO => ItemType::Fifo,
             S_IFSOCK => ItemType::Socket,
             _ => ItemType::Unknown,
+        }
+    }
+}
+
+impl RawItemType {
+    fn from_mode_lossy(mode: u32) -> RawItemType {
+        let mode_type = (mode >> 12) & 0b1111;
+        match mode_type {
+            S_IFLNK => RawItemType::SymbolicLink,
+            S_IFCHR => RawItemType::CharacterDevice,
+            S_IFBLK => RawItemType::BlockDevice,
+            _ => RawItemType::Sloppy,
         }
     }
 }
@@ -136,14 +156,41 @@ pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
     })
 }
 
-pub fn tar(header: &tar::Header) -> Result<Meta> {
+pub fn tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>) -> Result<Meta> {
+    let mode = header.mode()?;
     Ok(Meta {
         atime: 0,
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()?),
         ctime: 0,
         btime: 0,
-        item_type: ItemType::Unknown,
-        ownership: Ownership::Unknown,
+        item_type: match RawItemType::from_mode_lossy(mode) {
+            RawItemType::SymbolicLink => ItemType::SymbolicLink(
+                link_name_bytes
+                    .ok_or("symbolic-link style file with no link")?
+                    .to_vec()
+                    .into_boxed_slice(),
+            ),
+            RawItemType::CharacterDevice => ItemType::CharacterDevice {
+                major: header.device_major()?.ok_or("char device without major")?,
+                minor: header.device_minor()?.ok_or("char device without minor")?,
+            },
+            RawItemType::BlockDevice => ItemType::BlockDevice {
+                major: header.device_major()?.ok_or("block device without major")?,
+                minor: header.device_minor()?.ok_or("block device without minor")?,
+            },
+            RawItemType::Sloppy => ItemType::from_mode_lossy(mode),
+        },
+        ownership: Ownership::Posix {
+            user: Some(PosixEntity {
+                id: header.uid()?,
+                name: header.username()?.unwrap_or("").to_string(),
+            }),
+            group: Some(PosixEntity {
+                id: header.gid()?,
+                name: header.groupname()?.unwrap_or("").to_string(),
+            }),
+            mode: header.mode()?,
+        },
         xattrs: HashMap::new(),
     })
 }
