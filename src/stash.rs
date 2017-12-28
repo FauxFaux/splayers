@@ -7,7 +7,6 @@ use std::path::PathBuf;
 use tempdir::TempDir;
 use tempfile_fast::persistable_tempfile_in;
 
-use errors::*;
 use mio::Mio;
 
 #[derive(Debug, Copy, Clone)]
@@ -51,7 +50,7 @@ impl Stash {
         Ok(stashed)
     }
 
-    pub fn stash_take<R: Read>(&mut self, mut from: R, size: u64) -> io::Result<Option<Stashed>> {
+    pub fn stash_take<R: Read>(&mut self, from: R, size: u64) -> io::Result<Option<Stashed>> {
         Ok(if 0 == size {
             None
         } else {

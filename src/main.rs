@@ -38,7 +38,7 @@ fn run() -> Result<()> {
         mio::Mio::from_path(env::args().nth(1).expect("first argument: file"))?,
         &mut stash,
     ) {
-        unpacker::UnpackResult::Success(ref entries) => print(&entries, 0)?,
+        unpacker::UnpackResult::Success(ref entries) => print(entries, 0)?,
         other => println!("couldn't process file at all: {:?}", other),
     }
     println!("{:?}", stash.into_path());

@@ -1,14 +1,9 @@
-use std::fmt;
-
 use meta;
-use meta::ItemType;
 use errors::*;
 use filetype::FileType;
 use mio::Mio;
 use stash::Stash;
 use stash::Stashed;
-
-use std::io::Read;
 
 #[derive(Debug)]
 pub struct Entry {

@@ -30,8 +30,6 @@ pub enum ItemType {
     Socket,
     /// A symlink, with its destination.
     SymbolicLink(Box<[u8]>),
-    /// A hardlink, with its destination.
-    HardLink(Box<[u8]>),
     /// A 'c' device.
     CharacterDevice {
         major: u32,
@@ -147,7 +145,7 @@ pub fn ar(header: &ar::Header) -> Result<Meta> {
 pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
     Ok(Meta {
         atime: 0,
-        mtime: simple_time::simple_time_epoch_seconds(header.mtime() as u64),
+        mtime: simple_time::simple_time_epoch_seconds(u64::from(header.mtime())),
         ctime: 0,
         btime: 0,
         item_type: ItemType::RegularFile,

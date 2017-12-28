@@ -2,11 +2,10 @@ use std::io;
 use std::io::BufRead;
 use std::fs;
 use std::path::Path;
-use std::mem;
 
 use errors::*;
 
-/// Same as io::DEFAULT_BUF_SIZE.
+/// Same as `io::DEFAULT_BUF_SIZE`.
 const CAP: usize = 8 * 1024;
 const HEADER_CAP: usize = 1024;
 
