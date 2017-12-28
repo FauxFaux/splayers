@@ -59,6 +59,43 @@ pub struct PosixEntity {
     pub name: String,
 }
 
+/// Directory.
+const S_IFDIR: u32 = 0b1000;
+/// Regular file.
+const S_IFREG: u32 = 0b0100;
+/// Symbolic link.
+const S_IFLNK: u32 = 0b1010;
+/// Fifo/pipe.
+const S_IFIFO: u32 = 0b0001;
+/// Socket
+const S_IFSOCK: u32 = 0b1100;
+/// Character device.
+const S_IFCHR: u32 = 0b0010;
+/// Block device.
+const S_IFBLK: u32 = 0b0110;
+
+impl ItemType {
+    fn from_mode_lossy(mode: u32) -> ItemType {
+        let mode_type = (mode >> 12) & 0b1111;
+        match mode_type {
+            S_IFREG => ItemType::RegularFile,
+            S_IFDIR => ItemType::Directory,
+            S_IFIFO => ItemType::Fifo,
+            S_IFSOCK => ItemType::Socket,
+            _ => ItemType::Unknown,
+        }
+    }
+}
+
+impl PosixEntity {
+    fn just_id(id: u32) -> PosixEntity {
+        PosixEntity {
+            id,
+            name: String::new(),
+        }
+    }
+}
+
 pub fn just_stream() -> Meta {
     Meta {
         atime: 0,
@@ -77,8 +114,12 @@ pub fn ar(header: &ar::Header) -> Result<Meta> {
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()),
         ctime: 0,
         btime: 0,
-        item_type: ItemType::Unknown,
-        ownership: Ownership::Unknown,
+        item_type: ItemType::from_mode_lossy(header.mode()),
+        ownership: Ownership::Posix {
+            user: Some(PosixEntity::just_id(header.uid())),
+            group: Some(PosixEntity::just_id(header.gid())),
+            mode: header.mode(),
+        },
         xattrs: HashMap::new(),
     })
 }
