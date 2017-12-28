@@ -130,7 +130,7 @@ pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
         mtime: simple_time::simple_time_epoch_seconds(header.mtime() as u64),
         ctime: 0,
         btime: 0,
-        item_type: ItemType::Unknown,
+        item_type: ItemType::RegularFile,
         ownership: Ownership::Unknown,
         xattrs: HashMap::new(),
     })
@@ -154,8 +154,16 @@ pub fn zip(header: &zip::read::ZipFile) -> Result<Meta> {
         mtime: simple_time::simple_time_tm(header.last_modified()),
         ctime: 0,
         btime: 0,
-        item_type: ItemType::Unknown,
-        ownership: Ownership::Unknown,
+        item_type: ItemType::RegularFile,
+        ownership: if let Some(mode) = header.unix_mode() {
+            Ownership::Posix {
+                user: None,
+                group: None,
+                mode,
+            }
+        } else {
+            Ownership::Unknown
+        },
         xattrs: HashMap::new(),
     })
 }
