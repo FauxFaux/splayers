@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 
 use tempdir::TempDir;
@@ -18,9 +19,9 @@ pub struct FileList {
 }
 
 impl FileList {
-    pub fn new() -> io::Result<Self> {
+    pub fn new_in<P: AsRef<Path>>(inside: P) -> io::Result<Self> {
         Ok(FileList {
-            dir: TempDir::new(".splayed")?,
+            dir: TempDir::new_in(inside, ".splayers")?,
             len: 0,
         })
     }

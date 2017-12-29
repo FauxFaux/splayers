@@ -40,7 +40,7 @@ pub struct Unpack {
 
 impl Unpack {
     pub fn unpack<P: AsRef<Path>, F: AsRef<Path>>(root: P, what: F) -> Result<Unpack> {
-        let mut file_list = file_list::FileList::new()?;
+        let mut file_list = file_list::FileList::new_in(root)?;
         Ok(Unpack {
             status: unpacker::unpack_unknown(mio::Mio::from_path(what)?, &mut file_list),
             file_list,
