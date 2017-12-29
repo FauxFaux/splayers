@@ -3,10 +3,11 @@ extern crate splayers;
 use std::env;
 
 fn main() {
-    match splayers::unpack("/tmp", env::args_os().nth(1).expect("argument: file"))
-        .expect("unpacking failed")
+    let unpack = splayers::Unpack::unpack("/tmp", env::args_os().nth(1).expect("argument: file"))
+        .expect("unpacking failed");
+    match *unpack.status()
     {
-        splayers::UnpackResult::Success(ref entries) => splayers::print(entries, 0),
-        other => println!("top level: {:?}", other),
+        splayers::Status::Success(ref entries) => splayers::print(entries, 0),
+        ref other => println!("top level: {:?}", other),
     }
 }

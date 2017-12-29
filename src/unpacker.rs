@@ -1,25 +1,28 @@
+use std::io;
+use std::io::Read;
+
 use meta;
 use errors::*;
 use filetype::FileType;
 use mio::Mio;
-use stash::Stash;
-use stash::Stashed;
+use file_list::FileList;
+use file_list::Id;
 
 #[derive(Debug)]
 pub struct Entry {
     pub local: LocalEntry,
-    pub children: UnpackResult,
+    pub children: Status,
 }
 
 #[derive(Debug)]
 pub struct LocalEntry {
-    pub temp: Option<Stashed>,
+    pub temp: Option<Id>,
     pub meta: meta::Meta,
     pub path: Box<[u8]>,
 }
 
 #[derive(Debug)]
-pub enum UnpackResult {
+pub enum Status {
     Unnecessary,
     Unrecognised,
     Unsupported(FileType),
@@ -27,28 +30,28 @@ pub enum UnpackResult {
     Success(Vec<Entry>),
 }
 
-pub fn unpack_unknown(mut from: Mio, stash: &mut Stash) -> UnpackResult {
+pub fn unpack_unknown(mut from: Mio, file_list: &mut FileList) -> Status {
     match match FileType::identify(&from.header()) {
-        FileType::Deb => unpack_deb(from, stash),
-        FileType::Tar => unpack_tar(from, stash),
-        FileType::Zip => unpack_zip(from, stash),
-        FileType::Bz => unpack_bz(from, stash),
-        FileType::Gz => unpack_gz(from, stash),
-        FileType::Xz => unpack_xz(from, stash),
-        FileType::Empty => return UnpackResult::Unnecessary,
-        FileType::Other => return UnpackResult::Unrecognised,
-        other => return UnpackResult::Unsupported(other),
+        FileType::Deb => unpack_deb(from, file_list),
+        FileType::Tar => unpack_tar(from, file_list),
+        FileType::Zip => unpack_zip(from, file_list),
+        FileType::Bz => unpack_bz(from, file_list),
+        FileType::Gz => unpack_gz(from, file_list),
+        FileType::Xz => unpack_xz(from, file_list),
+        FileType::Empty => return Status::Unnecessary,
+        FileType::Other => return Status::Unrecognised,
+        other => return Status::Unsupported(other),
     } {
-        Ok(kids) => UnpackResult::Success(
+        Ok(kids) => Status::Success(
             kids.into_iter()
-                .map(|local| local.into_entry(stash))
+                .map(|local| local.into_entry(file_list))
                 .collect(),
         ),
-        Err(e) => UnpackResult::Error(format!("{}", e)),
+        Err(e) => Status::Error(format!("{}", e)),
     }
 }
 
-fn unpack_deb(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
+fn unpack_deb(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use ar;
 
     let mut entries = Vec::new();
@@ -68,14 +71,14 @@ fn unpack_deb(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: stash.push_take(entry, size)?,
+            temp: insert_if_non_empty(file_list, entry, size)?,
         });
     }
 
     Ok(entries)
 }
 
-fn unpack_tar(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
+fn unpack_tar(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use tar;
 
     let mut entries = Vec::new();
@@ -89,14 +92,14 @@ fn unpack_tar(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: stash.push_take(tar, size)?,
+            temp: insert_if_non_empty(file_list, tar, size)?,
         });
     }
 
     Ok(entries)
 }
 
-fn unpack_zip(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
+fn unpack_zip(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use zip;
 
     let mut entries = Vec::new();
@@ -112,18 +115,18 @@ fn unpack_zip(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: stash.push_take(entry, size)?,
+            temp: insert_if_non_empty(file_list, entry, size)?,
         });
     }
 
     Ok(entries)
 }
 
-fn unpack_bz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
+fn unpack_bz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use bzip2;
 
     let decoder = bzip2::read::BzDecoder::new(from);
-    let temp = Some(stash.insert(decoder)?);
+    let temp = Some(file_list.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -134,11 +137,11 @@ fn unpack_bz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     ])
 }
 
-fn unpack_gz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
+fn unpack_gz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use flate2;
     let decoder = flate2::read::GzDecoder::new(from);
     let header = decoder.header().ok_or("invalid header")?.clone();
-    let temp = Some(stash.insert(decoder)?);
+    let temp = Some(file_list.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -153,11 +156,11 @@ fn unpack_gz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     ])
 }
 
-fn unpack_xz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
+fn unpack_xz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use xz2;
 
     let decoder = xz2::read::XzDecoder::new(from);
-    let temp = Some(stash.insert(decoder)?);
+    let temp = Some(file_list.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -168,15 +171,27 @@ fn unpack_xz(from: Mio, stash: &mut Stash) -> Result<Vec<LocalEntry>> {
     ])
 }
 
+fn insert_if_non_empty<R: Read>(
+    file_list: &mut FileList,
+    from: R,
+    size: u64,
+) -> io::Result<Option<Id>> {
+    Ok(if 0 == size {
+        None
+    } else {
+        Some(file_list.insert(from.take(size))?)
+    })
+}
+
 impl LocalEntry {
-    fn into_entry(mut self, stash: &mut Stash) -> Entry {
+    fn into_entry(mut self, file_list: &mut FileList) -> Entry {
         let children = if let Some(temp) = self.temp.as_ref() {
             unpack_unknown(
-                Mio::from_path(stash.path_of(*temp)).expect("working with stash"),
-                stash,
+                Mio::from_path(file_list.path_of(*temp)).expect("working with file_list"),
+                file_list,
             )
         } else {
-            UnpackResult::Unnecessary
+            Status::Unnecessary
         };
 
         if children.fully_consumed() {
@@ -190,10 +205,10 @@ impl LocalEntry {
     }
 }
 
-impl UnpackResult {
+impl Status {
     fn fully_consumed(&self) -> bool {
         match *self {
-            UnpackResult::Success(ref v) if !v.is_empty() => true,
+            Status::Success(ref v) if !v.is_empty() => true,
             _ => false,
         }
     }

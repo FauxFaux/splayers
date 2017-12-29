@@ -19,24 +19,41 @@ extern crate xz2;
 extern crate zip;
 
 use std::path::Path;
+use std::path::PathBuf;
 
 mod errors;
+mod file_list;
 mod filetype;
 mod meta;
 mod mio;
 mod simple_time;
-mod stash;
 mod unpacker;
 
-pub use unpacker::UnpackResult;
-use errors::*;
+pub use errors::*;
+pub use file_list::Id;
+pub use unpacker::Status;
 
-pub fn unpack<P: AsRef<Path>, F: AsRef<Path>>(root: P, what: F) -> Result<UnpackResult> {
-    let mut stash = stash::Stash::new()?;
-    Ok(unpacker::unpack_unknown(
-        mio::Mio::from_path(what)?,
-        &mut stash,
-    ))
+pub struct Unpack {
+    file_list: file_list::FileList,
+    status: Status,
+}
+
+impl Unpack {
+    pub fn unpack<P: AsRef<Path>, F: AsRef<Path>>(root: P, what: F) -> Result<Unpack> {
+        let mut file_list = file_list::FileList::new()?;
+        Ok(Unpack {
+            status: unpacker::unpack_unknown(mio::Mio::from_path(what)?, &mut file_list),
+            file_list,
+        })
+    }
+
+    pub fn status(&self) -> &Status {
+        &self.status
+    }
+
+    pub fn path_of(&self, item: Id) -> PathBuf {
+        self.file_list.path_of(item)
+    }
 }
 
 pub fn print(entries: &[unpacker::Entry], depth: usize) {
@@ -48,7 +65,7 @@ pub fn print(entries: &[unpacker::Entry], depth: usize) {
             entry.local.temp
         );
 
-        if let unpacker::UnpackResult::Success(ref children) = entry.children {
+        if let unpacker::Status::Success(ref children) = entry.children {
             println!();
             print(children, depth + 2);
         } else {
