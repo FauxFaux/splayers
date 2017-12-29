@@ -3,13 +3,18 @@ use std::fmt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FileType {
-    Empty,
+    // Archives
     Gz,
     Zip,
     Tar,
     Bz,
     Xz,
     Deb,
+
+    // Special
+    Empty,
+    Binary,
+    Source,
     Other,
 }
 
@@ -101,8 +106,36 @@ impl FileType {
             FileType::Xz
         } else if is_probably_tar(header) {
             FileType::Tar
+        } else if header.contains(&0) {
+            FileType::Binary
+        } else if source(header) {
+            FileType::Source
         } else {
             FileType::Other
         }
     }
+}
+
+fn source(header: &[u8]) -> bool {
+    // Unix script shebang with absolute path.
+    if header.len() > 16 && b'#' == header[0] && b'!' == header[1]
+        && (b'/' == header[2] || b'/' == header[3])
+    {
+        return true;
+    }
+
+    // C-like language comment.
+    if header.len() > 16 &&
+        b'/' == header[0] &&
+            (b'*' == header[1] || b'/' == header[1]) {
+        return true;
+    }
+
+    if header.len() > 16 &&
+        b'<' == header[0] &&
+            (b'?' == header[1] || b'h' == header[1] || b'!' == header[1]) {
+        return true;
+    }
+
+    false
 }
