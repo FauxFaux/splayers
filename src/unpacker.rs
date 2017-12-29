@@ -88,7 +88,7 @@ fn unpack_tar<R: Read>(from: R, file_list: &mut FileList) -> Result<Vec<LocalEnt
     for tar in tar::Archive::new(from).entries()? {
         let tar = tar?;
         let size = tar.header().size()?;
-        let path = tar.header().path_bytes().to_vec().into_boxed_slice();
+        let path = tar.path_bytes().to_vec().into_boxed_slice();
         let mut meta = meta::tar(tar.header(), tar.link_name_bytes())?;
 
         entries.push(LocalEntry {
