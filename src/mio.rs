@@ -2,6 +2,7 @@ use std::io;
 use std::io::BufRead;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use errors::*;
 
@@ -11,26 +12,38 @@ const HEADER_CAP: usize = 1024;
 
 pub struct Mio {
     inner: io::BufReader<fs::File>,
+    path: PathBuf,
 }
 
 impl Mio {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Mio> {
         Ok(Mio {
+            path: path.as_ref().to_path_buf(),
             inner: io::BufReader::with_capacity(CAP, fs::File::open(path)?),
         })
     }
 
     // should return a slice but the BORROW CHECKER is actually dumb (I'm 99% sure)
     pub fn header(&mut self) -> Vec<u8> {
-        let mut last_attempt = 0;
-        loop {
-            let buf = self.inner.fill_buf().expect("mio: filling");
-            debug_assert_lt!(HEADER_CAP, CAP);
-            if buf.len() > HEADER_CAP || buf.len() == last_attempt {
-                return buf.to_vec();
-            }
-            last_attempt = buf.len();
+        fill_buf(&mut self.inner)
+    }
+}
+
+impl Clone for Mio {
+    fn clone(&self) -> Self {
+        Mio::from_path(&self.path).expect("mio: clone")
+    }
+}
+
+pub fn fill_buf<R: BufRead>(mut of: R) -> Vec<u8> {
+    let mut last_attempt = 0;
+    loop {
+        let buf = of.fill_buf().expect("mio: filling");
+        debug_assert_lt!(HEADER_CAP, CAP);
+        if buf.len() > HEADER_CAP || buf.len() == last_attempt {
+            return buf.to_vec();
         }
+        last_attempt = buf.len();
     }
 }
 

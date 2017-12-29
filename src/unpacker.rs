@@ -3,7 +3,9 @@ use std::io::Read;
 
 use meta;
 use errors::*;
+use filetype;
 use filetype::FileType;
+use mio;
 use mio::Mio;
 use file_list::FileList;
 use file_list::Id;
@@ -78,7 +80,7 @@ fn unpack_deb(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     Ok(entries)
 }
 
-fn unpack_tar(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
+fn unpack_tar<R: Read>(from: R, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use tar;
 
     let mut entries = Vec::new();
@@ -122,10 +124,31 @@ fn unpack_zip(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     Ok(entries)
 }
 
+fn embedded_tar<F, T: Read>(
+    from: Mio,
+    make: F,
+    file_list: &mut FileList,
+) -> ::std::result::Result<Vec<LocalEntry>, io::BufReader<T>>
+where
+    F: Fn(Mio) -> T,
+{
+    let backup = from.clone();
+    let mut decoder = io::BufReader::new(make(from));
+    if !filetype::is_probably_tar(&mio::fill_buf(&mut decoder)) {
+        return Err(decoder);
+    }
+
+    unpack_tar(decoder, file_list).map_err(|_| io::BufReader::new(make(backup)))
+}
+
 fn unpack_bz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use bzip2;
 
-    let decoder = bzip2::read::BzDecoder::new(from);
+    let decoder = match embedded_tar(from, |mio| bzip2::read::BzDecoder::new(mio), file_list) {
+        Ok(vec) => return Ok(vec),
+        Err(decoder) => decoder,
+    };
+
     let temp = Some(file_list.insert(decoder)?);
 
     Ok(vec![
@@ -139,8 +162,13 @@ fn unpack_bz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
 
 fn unpack_gz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use flate2;
-    let decoder = flate2::read::GzDecoder::new(from);
-    let header = decoder.header().ok_or("invalid header")?.clone();
+
+    let decoder = match embedded_tar(from, |mio| flate2::read::GzDecoder::new(mio), file_list) {
+        Ok(vec) => return Ok(vec),
+        Err(decoder) => decoder,
+    };
+
+    let header = decoder.get_ref().header().ok_or("invalid header")?.clone();
     let temp = Some(file_list.insert(decoder)?);
 
     Ok(vec![
@@ -159,7 +187,11 @@ fn unpack_gz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
 fn unpack_xz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use xz2;
 
-    let decoder = xz2::read::XzDecoder::new(from);
+    let decoder = match embedded_tar(from, |mio| xz2::read::XzDecoder::new(mio), file_list) {
+        Ok(vec) => return Ok(vec),
+        Err(decoder) => decoder,
+    };
+
     let temp = Some(file_list.insert(decoder)?);
 
     Ok(vec![

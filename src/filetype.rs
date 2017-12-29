@@ -38,9 +38,17 @@ fn read_octal(bytes: &[u8]) -> Option<u32> {
     None
 }
 
-fn is_probably_tar(header: &[u8]) -> bool {
+pub fn is_probably_tar(header: &[u8]) -> bool {
     if header.len() < 512 {
         return false;
+    }
+
+    if header.len() > 257 + 10 && b'u' == header[257] && b's' == header[258] && b't' == header[259]
+        && b'a' == header[260] && b'r' == header[261]
+        && ((0 == header[262] && b'0' == header[263] && b'0' == header[264])
+            || (b' ' == header[262] && b' ' == header[263] && 0 == header[264]))
+    {
+        return true;
     }
 
     if let Some(expected) = read_octal(&header[148..156]) {
@@ -91,15 +99,7 @@ impl FileType {
             && b'z' == header[2] && b'X' == header[3]
             && b'Z' == header[4] && 0 == header[5] {
             FileType::Xz
-        } else if (header.len() > 257 + 10
-                && b'u' == header[257] && b's' == header[258]
-                && b't' == header[259] && b'a' == header[260]
-                && b'r' == header[261]
-                && (
-                (0 == header[262] && b'0' == header[263] && b'0' == header[264]) ||
-                    (b' ' == header[262] && b' ' == header[263] && 0 == header[264])
-                )
-            ) || is_probably_tar(header) {
+        } else if is_probably_tar(header) {
             FileType::Tar
         } else {
             FileType::Other

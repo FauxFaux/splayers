@@ -5,8 +5,7 @@ use std::env;
 fn main() {
     let unpack = splayers::Unpack::unpack("/tmp", env::args_os().nth(1).expect("argument: file"))
         .expect("unpacking failed");
-    match *unpack.status()
-    {
+    match *unpack.status() {
         splayers::Status::Success(ref entries) => splayers::print(entries, 0),
         ref other => println!("top level: {:?}", other),
     }
