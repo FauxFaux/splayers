@@ -124,29 +124,33 @@ fn unpack_zip(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     Ok(entries)
 }
 
-fn embedded_tar<F, T: Read>(
-    from: Mio,
-    make: F,
-    file_list: &mut FileList,
-) -> ::std::result::Result<Vec<LocalEntry>, io::BufReader<T>>
+enum EmbeddedTar<T> {
+    Found(Vec<LocalEntry>),
+    Absent(io::BufReader<T>),
+}
+
+fn embedded_tar<F, T: Read>(from: Mio, make: F, file_list: &mut FileList) -> Result<EmbeddedTar<T>>
 where
     F: Fn(Mio) -> T,
 {
     let backup = from.clone();
     let mut decoder = io::BufReader::new(make(from));
-    if !filetype::is_probably_tar(&mio::fill_buf(&mut decoder)) {
-        return Err(decoder);
+    if !filetype::is_probably_tar(&mio::fill_buf(&mut decoder)?) {
+        return Ok(EmbeddedTar::Absent(decoder));
     }
 
-    unpack_tar(decoder, file_list).map_err(|_| io::BufReader::new(make(backup)))
+    Ok(match unpack_tar(decoder, file_list) {
+        Ok(v) => EmbeddedTar::Found(v),
+        Err(_) => EmbeddedTar::Absent(io::BufReader::new(make(backup))),
+    })
 }
 
 fn unpack_bz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use bzip2;
 
-    let decoder = match embedded_tar(from, |mio| bzip2::read::BzDecoder::new(mio), file_list) {
-        Ok(vec) => return Ok(vec),
-        Err(decoder) => decoder,
+    let decoder = match embedded_tar(from, |mio| bzip2::read::BzDecoder::new(mio), file_list)? {
+        EmbeddedTar::Found(vec) => return Ok(vec),
+        EmbeddedTar::Absent(decoder) => decoder,
     };
 
     let temp = Some(file_list.insert(decoder)?);
@@ -163,9 +167,9 @@ fn unpack_bz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
 fn unpack_gz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use flate2;
 
-    let decoder = match embedded_tar(from, |mio| flate2::read::GzDecoder::new(mio), file_list) {
-        Ok(vec) => return Ok(vec),
-        Err(decoder) => decoder,
+    let decoder = match embedded_tar(from, |mio| flate2::read::GzDecoder::new(mio), file_list)? {
+        EmbeddedTar::Found(vec) => return Ok(vec),
+        EmbeddedTar::Absent(decoder) => decoder,
     };
 
     let header = decoder.get_ref().header().ok_or("invalid header")?.clone();
@@ -187,9 +191,9 @@ fn unpack_gz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
 fn unpack_xz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     use xz2;
 
-    let decoder = match embedded_tar(from, |mio| xz2::read::XzDecoder::new(mio), file_list) {
-        Ok(vec) => return Ok(vec),
-        Err(decoder) => decoder,
+    let decoder = match embedded_tar(from, |mio| xz2::read::XzDecoder::new(mio), file_list)? {
+        EmbeddedTar::Found(vec) => return Ok(vec),
+        EmbeddedTar::Absent(decoder) => decoder,
     };
 
     let temp = Some(file_list.insert(decoder)?);

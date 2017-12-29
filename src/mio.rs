@@ -25,7 +25,7 @@ impl Mio {
 
     // should return a slice but the BORROW CHECKER is actually dumb (I'm 99% sure)
     pub fn header(&mut self) -> Vec<u8> {
-        fill_buf(&mut self.inner)
+        fill_buf(&mut self.inner).expect("mio: filling")
     }
 }
 
@@ -35,13 +35,13 @@ impl Clone for Mio {
     }
 }
 
-pub fn fill_buf<R: BufRead>(mut of: R) -> Vec<u8> {
+pub fn fill_buf<R: BufRead>(mut of: R) -> io::Result<Vec<u8>> {
     let mut last_attempt = 0;
     loop {
-        let buf = of.fill_buf().expect("mio: filling");
+        let buf = of.fill_buf()?;
         debug_assert_lt!(HEADER_CAP, CAP);
         if buf.len() > HEADER_CAP || buf.len() == last_attempt {
-            return buf.to_vec();
+            return Ok(buf.to_vec());
         }
         last_attempt = buf.len();
     }
