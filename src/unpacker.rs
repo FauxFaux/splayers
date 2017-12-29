@@ -3,8 +3,8 @@ use std::io::Read;
 
 use meta;
 use errors::*;
-use filetype;
-use filetype::FileType;
+use file_type;
+use file_type::FileType;
 use mio;
 use mio::Mio;
 use file_list::FileList;
@@ -135,7 +135,7 @@ where
 {
     let backup = from.clone();
     let mut decoder = io::BufReader::new(make(from));
-    if !filetype::is_probably_tar(&mio::fill_buf(&mut decoder)?) {
+    if !file_type::is_probably_tar(&mio::fill_buf(&mut decoder)?) {
         return Ok(EmbeddedTar::Absent(decoder));
     }
 

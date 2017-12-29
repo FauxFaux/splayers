@@ -23,7 +23,7 @@ use std::path::PathBuf;
 
 mod errors;
 mod file_list;
-mod filetype;
+mod file_type;
 mod meta;
 mod mio;
 mod simple_time;
