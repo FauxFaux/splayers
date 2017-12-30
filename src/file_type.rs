@@ -129,11 +129,34 @@ fn source(header: &[u8]) -> bool {
         return true;
     }
 
+    // XML or HTML
     if header.len() > 16 && b'<' == header[0]
-        && (b'?' == header[1] || b'h' == header[1] || b'!' == header[1])
+        && (b'?' == header[1] || b'h' == header[1] || b'H' == header[1] || b'!' == header[1])
+    {
+        return true;
+    }
+
+    if header.starts_with(b"#Generated") {
+        return true;
+    }
+
+    // Non-shebang scripty-languages with # as comment, and a copyright header.
+    if header.starts_with(b"#") && (contains(header, b"Copyright") || contains(header, b"License"))
+    {
+        return true;
+    }
+
+    // Java
+    if header.starts_with(b"import ") || header.starts_with("package ")
+        || header.starts_with("public class ")
     {
         return true;
     }
 
     false
+}
+
+fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+    // we don't especially care about the performance here; it's just convenient
+    ::twoway::find_bytes(haystack, needle).is_some()
 }

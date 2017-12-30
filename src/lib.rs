@@ -11,6 +11,7 @@ extern crate flate2;
 extern crate tar;
 extern crate tempdir;
 extern crate time as crates_time;
+extern crate twoway;
 
 #[macro_use]
 extern crate more_asserts;
