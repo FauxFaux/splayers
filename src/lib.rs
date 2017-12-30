@@ -21,7 +21,7 @@ extern crate zip;
 use std::path::Path;
 
 mod errors;
-mod file_list;
+mod temps;
 mod file_type;
 mod meta;
 mod mio;
@@ -34,7 +34,7 @@ pub use unpacker::Status;
 pub fn unpack_into<P: AsRef<Path>, F: AsRef<Path>>(what: F, root: P) -> Result<Status> {
     Ok(unpacker::unpack_unknown(
         mio::Mio::from_path(what)?,
-        &mut file_list::Temps::new_in(root)?,
+        &mut temps::Temps::new_in(root)?,
     ))
 }
 

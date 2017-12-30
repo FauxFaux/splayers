@@ -8,7 +8,7 @@ use file_type;
 use file_type::FileType;
 use mio;
 use mio::Mio;
-use file_list::Temps;
+use temps::Temps;
 
 #[derive(Debug)]
 pub struct Entry {
@@ -32,28 +32,28 @@ pub enum Status {
     Success(Vec<Entry>),
 }
 
-pub fn unpack_unknown(mut from: Mio, file_list: &mut Temps) -> Status {
+pub fn unpack_unknown(mut from: Mio, temps: &mut Temps) -> Status {
     match match FileType::identify(&from.header()) {
-        FileType::Deb => unpack_deb(from, file_list),
-        FileType::Tar => unpack_tar(from, file_list),
-        FileType::Zip => unpack_zip(from, file_list),
-        FileType::Bz => unpack_bz(from, file_list),
-        FileType::Gz => unpack_gz(from, file_list),
-        FileType::Xz => unpack_xz(from, file_list),
+        FileType::Deb => unpack_deb(from, temps),
+        FileType::Tar => unpack_tar(from, temps),
+        FileType::Zip => unpack_zip(from, temps),
+        FileType::Bz => unpack_bz(from, temps),
+        FileType::Gz => unpack_gz(from, temps),
+        FileType::Xz => unpack_xz(from, temps),
         FileType::Empty => return Status::Unnecessary,
         FileType::Other => return Status::Unrecognised,
         other => return Status::Unsupported(other),
     } {
         Ok(kids) => Status::Success(
             kids.into_iter()
-                .map(|local| local.into_entry(file_list))
+                .map(|local| local.into_entry(temps))
                 .collect(),
         ),
         Err(e) => Status::Error(format!("{}", e)),
     }
 }
 
-fn unpack_deb(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_deb(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use ar;
 
     let mut entries = Vec::new();
@@ -73,14 +73,14 @@ fn unpack_deb(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: insert_if_non_empty(file_list, entry, size)?,
+            temp: insert_if_non_empty(temps, entry, size)?,
         });
     }
 
     Ok(entries)
 }
 
-fn unpack_tar<R: Read>(from: R, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_tar<R: Read>(from: R, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use tar;
 
     let mut entries = Vec::new();
@@ -94,14 +94,14 @@ fn unpack_tar<R: Read>(from: R, file_list: &mut Temps) -> Result<Vec<LocalEntry>
         entries.push(LocalEntry {
             meta,
             path,
-            temp: insert_if_non_empty(file_list, tar, size)?,
+            temp: insert_if_non_empty(temps, tar, size)?,
         });
     }
 
     Ok(entries)
 }
 
-fn unpack_zip(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_zip(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use zip;
 
     let mut entries = Vec::new();
@@ -117,7 +117,7 @@ fn unpack_zip(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
         entries.push(LocalEntry {
             meta,
             path,
-            temp: insert_if_non_empty(file_list, entry, size)?,
+            temp: insert_if_non_empty(temps, entry, size)?,
         });
     }
 
@@ -129,7 +129,7 @@ enum EmbeddedTar<T> {
     Absent(io::BufReader<T>),
 }
 
-fn embedded_tar<F, T: Read>(from: Mio, make: F, file_list: &mut Temps) -> Result<EmbeddedTar<T>>
+fn embedded_tar<F, T: Read>(from: Mio, make: F, temps: &mut Temps) -> Result<EmbeddedTar<T>>
 where
     F: Fn(Mio) -> T,
 {
@@ -139,21 +139,21 @@ where
         return Ok(EmbeddedTar::Absent(decoder));
     }
 
-    Ok(match unpack_tar(decoder, file_list) {
+    Ok(match unpack_tar(decoder, temps) {
         Ok(v) => EmbeddedTar::Found(v),
         Err(_) => EmbeddedTar::Absent(io::BufReader::new(make(backup))),
     })
 }
 
-fn unpack_bz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_bz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use bzip2;
 
-    let decoder = match embedded_tar(from, |mio| bzip2::read::BzDecoder::new(mio), file_list)? {
+    let decoder = match embedded_tar(from, |mio| bzip2::read::BzDecoder::new(mio), temps)? {
         EmbeddedTar::Found(vec) => return Ok(vec),
         EmbeddedTar::Absent(decoder) => decoder,
     };
 
-    let temp = Some(file_list.insert(decoder)?);
+    let temp = Some(temps.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -164,16 +164,16 @@ fn unpack_bz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
     ])
 }
 
-fn unpack_gz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use flate2;
 
-    let decoder = match embedded_tar(from, |mio| flate2::read::GzDecoder::new(mio), file_list)? {
+    let decoder = match embedded_tar(from, |mio| flate2::read::GzDecoder::new(mio), temps)? {
         EmbeddedTar::Found(vec) => return Ok(vec),
         EmbeddedTar::Absent(decoder) => decoder,
     };
 
     let header = decoder.get_ref().header().ok_or("invalid header")?.clone();
-    let temp = Some(file_list.insert(decoder)?);
+    let temp = Some(temps.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -188,15 +188,15 @@ fn unpack_gz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
     ])
 }
 
-fn unpack_xz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_xz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use xz2;
 
-    let decoder = match embedded_tar(from, |mio| xz2::read::XzDecoder::new(mio), file_list)? {
+    let decoder = match embedded_tar(from, |mio| xz2::read::XzDecoder::new(mio), temps)? {
         EmbeddedTar::Found(vec) => return Ok(vec),
         EmbeddedTar::Absent(decoder) => decoder,
     };
 
-    let temp = Some(file_list.insert(decoder)?);
+    let temp = Some(temps.insert(decoder)?);
 
     Ok(vec![
         LocalEntry {
@@ -208,23 +208,23 @@ fn unpack_xz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
 }
 
 fn insert_if_non_empty<R: Read>(
-    file_list: &mut Temps,
+    temps: &mut Temps,
     from: R,
     size: u64,
 ) -> io::Result<Option<PathBuf>> {
     Ok(if 0 == size {
         None
     } else {
-        Some(file_list.insert(from.take(size))?)
+        Some(temps.insert(from.take(size))?)
     })
 }
 
 impl LocalEntry {
-    fn into_entry(mut self, file_list: &mut Temps) -> Entry {
+    fn into_entry(mut self, temps: &mut Temps) -> Entry {
         let children = if let Some(temp) = self.temp.as_ref() {
             unpack_unknown(
-                Mio::from_path(temp).expect("working with file_list"),
-                file_list,
+                Mio::from_path(temp).expect("working with temps"),
+                temps,
             )
         } else {
             Status::Unnecessary
