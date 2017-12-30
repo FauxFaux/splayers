@@ -125,15 +125,13 @@ fn source(header: &[u8]) -> bool {
     }
 
     // C-like language comment.
-    if header.len() > 16 &&
-        b'/' == header[0] &&
-            (b'*' == header[1] || b'/' == header[1]) {
+    if header.len() > 16 && b'/' == header[0] && (b'*' == header[1] || b'/' == header[1]) {
         return true;
     }
 
-    if header.len() > 16 &&
-        b'<' == header[0] &&
-            (b'?' == header[1] || b'h' == header[1] || b'!' == header[1]) {
+    if header.len() > 16 && b'<' == header[0]
+        && (b'?' == header[1] || b'h' == header[1] || b'!' == header[1])
+    {
         return true;
     }
 

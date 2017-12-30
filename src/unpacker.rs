@@ -1,5 +1,6 @@
 use std::io;
 use std::io::Read;
+use std::path::PathBuf;
 
 use meta;
 use errors::*;
@@ -7,8 +8,7 @@ use file_type;
 use file_type::FileType;
 use mio;
 use mio::Mio;
-use file_list::FileList;
-use file_list::Id;
+use file_list::Temps;
 
 #[derive(Debug)]
 pub struct Entry {
@@ -18,7 +18,7 @@ pub struct Entry {
 
 #[derive(Debug)]
 pub struct LocalEntry {
-    pub temp: Option<Id>,
+    pub temp: Option<PathBuf>,
     pub meta: meta::Meta,
     pub path: Box<[u8]>,
 }
@@ -32,7 +32,7 @@ pub enum Status {
     Success(Vec<Entry>),
 }
 
-pub fn unpack_unknown(mut from: Mio, file_list: &mut FileList) -> Status {
+pub fn unpack_unknown(mut from: Mio, file_list: &mut Temps) -> Status {
     match match FileType::identify(&from.header()) {
         FileType::Deb => unpack_deb(from, file_list),
         FileType::Tar => unpack_tar(from, file_list),
@@ -53,7 +53,7 @@ pub fn unpack_unknown(mut from: Mio, file_list: &mut FileList) -> Status {
     }
 }
 
-fn unpack_deb(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
+fn unpack_deb(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
     use ar;
 
     let mut entries = Vec::new();
@@ -80,7 +80,7 @@ fn unpack_deb(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     Ok(entries)
 }
 
-fn unpack_tar<R: Read>(from: R, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
+fn unpack_tar<R: Read>(from: R, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
     use tar;
 
     let mut entries = Vec::new();
@@ -101,7 +101,7 @@ fn unpack_tar<R: Read>(from: R, file_list: &mut FileList) -> Result<Vec<LocalEnt
     Ok(entries)
 }
 
-fn unpack_zip(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
+fn unpack_zip(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
     use zip;
 
     let mut entries = Vec::new();
@@ -129,7 +129,7 @@ enum EmbeddedTar<T> {
     Absent(io::BufReader<T>),
 }
 
-fn embedded_tar<F, T: Read>(from: Mio, make: F, file_list: &mut FileList) -> Result<EmbeddedTar<T>>
+fn embedded_tar<F, T: Read>(from: Mio, make: F, file_list: &mut Temps) -> Result<EmbeddedTar<T>>
 where
     F: Fn(Mio) -> T,
 {
@@ -145,7 +145,7 @@ where
     })
 }
 
-fn unpack_bz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
+fn unpack_bz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
     use bzip2;
 
     let decoder = match embedded_tar(from, |mio| bzip2::read::BzDecoder::new(mio), file_list)? {
@@ -164,7 +164,7 @@ fn unpack_bz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     ])
 }
 
-fn unpack_gz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
+fn unpack_gz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
     use flate2;
 
     let decoder = match embedded_tar(from, |mio| flate2::read::GzDecoder::new(mio), file_list)? {
@@ -188,7 +188,7 @@ fn unpack_gz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
     ])
 }
 
-fn unpack_xz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
+fn unpack_xz(from: Mio, file_list: &mut Temps) -> Result<Vec<LocalEntry>> {
     use xz2;
 
     let decoder = match embedded_tar(from, |mio| xz2::read::XzDecoder::new(mio), file_list)? {
@@ -208,10 +208,10 @@ fn unpack_xz(from: Mio, file_list: &mut FileList) -> Result<Vec<LocalEntry>> {
 }
 
 fn insert_if_non_empty<R: Read>(
-    file_list: &mut FileList,
+    file_list: &mut Temps,
     from: R,
     size: u64,
-) -> io::Result<Option<Id>> {
+) -> io::Result<Option<PathBuf>> {
     Ok(if 0 == size {
         None
     } else {
@@ -220,10 +220,10 @@ fn insert_if_non_empty<R: Read>(
 }
 
 impl LocalEntry {
-    fn into_entry(mut self, file_list: &mut FileList) -> Entry {
+    fn into_entry(mut self, file_list: &mut Temps) -> Entry {
         let children = if let Some(temp) = self.temp.as_ref() {
             unpack_unknown(
-                Mio::from_path(file_list.path_of(*temp)).expect("working with file_list"),
+                Mio::from_path(temp).expect("working with file_list"),
                 file_list,
             )
         } else {

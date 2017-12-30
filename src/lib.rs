@@ -19,7 +19,6 @@ extern crate xz2;
 extern crate zip;
 
 use std::path::Path;
-use std::path::PathBuf;
 
 mod errors;
 mod file_list;
@@ -30,30 +29,13 @@ mod simple_time;
 mod unpacker;
 
 pub use errors::*;
-pub use file_list::Id;
 pub use unpacker::Status;
 
-pub struct Unpack {
-    file_list: file_list::FileList,
-    status: Status,
-}
-
-impl Unpack {
-    pub fn unpack<P: AsRef<Path>, F: AsRef<Path>>(root: P, what: F) -> Result<Unpack> {
-        let mut file_list = file_list::FileList::new_in(root)?;
-        Ok(Unpack {
-            status: unpacker::unpack_unknown(mio::Mio::from_path(what)?, &mut file_list),
-            file_list,
-        })
-    }
-
-    pub fn status(&self) -> &Status {
-        &self.status
-    }
-
-    pub fn path_of(&self, item: Id) -> PathBuf {
-        self.file_list.path_of(item)
-    }
+pub fn unpack_into<P: AsRef<Path>, F: AsRef<Path>>(what: F, root: P) -> Result<Status> {
+    Ok(unpacker::unpack_unknown(
+        mio::Mio::from_path(what)?,
+        &mut file_list::Temps::new_in(root)?,
+    ))
 }
 
 pub fn print(entries: &[unpacker::Entry], depth: usize) {
