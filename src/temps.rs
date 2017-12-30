@@ -23,7 +23,14 @@ impl Temps {
 
     pub fn insert<R: Read>(&mut self, mut from: R) -> io::Result<PathBuf> {
         let mut dest = self.dir.as_ref().to_path_buf();
-        dest.push(format!(".{}.tmp", self.count));
+        let three_hex_digits = 4096;
+        let subdir = self.count / three_hex_digits;
+        let in_dir = self.count % three_hex_digits;
+        dest.push(format!("{}", subdir));
+        if 0 == in_dir {
+            fs::create_dir(&dest).expect("tempdir");
+        }
+        dest.push(format!("{:03x}.tmp", in_dir));
 
         self.count += 1;
 
@@ -41,5 +48,9 @@ impl Temps {
         }
 
         Ok(dest)
+    }
+
+    pub fn into_dir(self) -> TempDir {
+        self.dir
     }
 }

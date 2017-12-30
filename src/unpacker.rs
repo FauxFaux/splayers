@@ -222,10 +222,7 @@ fn insert_if_non_empty<R: Read>(
 impl LocalEntry {
     fn into_entry(mut self, temps: &mut Temps) -> Entry {
         let children = if let Some(temp) = self.temp.as_ref() {
-            unpack_unknown(
-                Mio::from_path(temp).expect("working with temps"),
-                temps,
-            )
+            unpack_unknown(Mio::from_path(temp).expect("working with temps"), temps)
         } else {
             Status::Unnecessary
         };

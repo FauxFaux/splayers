@@ -19,6 +19,7 @@ extern crate xz2;
 extern crate zip;
 
 use std::path::Path;
+use std::path::PathBuf;
 
 mod errors;
 mod temps;
@@ -31,11 +32,28 @@ mod unpacker;
 pub use errors::*;
 pub use unpacker::Status;
 
-pub fn unpack_into<P: AsRef<Path>, F: AsRef<Path>>(what: F, root: P) -> Result<Status> {
-    Ok(unpacker::unpack_unknown(
-        mio::Mio::from_path(what)?,
-        &mut temps::Temps::new_in(root)?,
-    ))
+pub struct Unpack {
+    status: Status,
+    dir: tempdir::TempDir,
+}
+
+impl Unpack {
+    pub fn unpack_into<P: AsRef<Path>, F: AsRef<Path>>(what: F, root: P) -> Result<Unpack> {
+        let mut temps = temps::Temps::new_in(root)?;
+        Ok(Unpack {
+            status: unpacker::unpack_unknown(mio::Mio::from_path(what)?, &mut temps),
+            dir: temps.into_dir(),
+        })
+    }
+
+    pub fn status(&self) -> &Status {
+        &self.status
+    }
+
+    /// causes the temporary files to not be deleted
+    pub fn into_path(self) -> PathBuf {
+        self.dir.into_path()
+    }
 }
 
 pub fn print(entries: &[unpacker::Entry], depth: usize) {
