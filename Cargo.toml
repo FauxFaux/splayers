@@ -15,7 +15,7 @@ ar = "0.4"
 bzip2 = "0.3"
 flate2 = "1"
 tar = "0.4"
-xz2 = { git = "https://github.com/alexcrichton/xz2-rs", rev = "7458dd89fd504be344b39db451ca6361b3ac9ae2" }
+xz2 = "0.1.4"
 zip = "0.2"
 
 
