@@ -147,8 +147,8 @@ fn source(header: &[u8]) -> bool {
     }
 
     // Java
-    if header.starts_with(b"import ") || header.starts_with("package ")
-        || header.starts_with("public class ")
+    if header.starts_with(b"import ") || header.starts_with(b"package ")
+        || header.starts_with(b"public class ")
     {
         return true;
     }
