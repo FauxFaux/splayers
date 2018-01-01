@@ -1,5 +1,4 @@
 use std::borrow;
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -16,7 +15,6 @@ pub struct Meta {
     pub mtime: u64,
     pub item_type: ItemType,
     pub ownership: Ownership,
-    pub xattrs: HashMap<String, Box<[u8]>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -118,7 +116,6 @@ pub fn just_stream() -> Meta {
         mtime: 0,
         item_type: ItemType::RegularFile,
         ownership: Ownership::Unknown,
-        xattrs: HashMap::new(),
     }
 }
 
@@ -139,7 +136,6 @@ pub fn file<P: AsRef<Path>>(path: P) -> Result<Meta> {
         mtime: simple_time::simple_time_sys(meta.modified()?),
         item_type,
         ownership: Ownership::Unknown,
-        xattrs: HashMap::new(),
     })
 }
 
@@ -152,7 +148,6 @@ pub fn ar(header: &ar::Header) -> Result<Meta> {
             group: Some(PosixEntity::just_id(header.gid())),
             mode: header.mode(),
         },
-        xattrs: HashMap::new(),
     })
 }
 
@@ -161,7 +156,6 @@ pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
         mtime: simple_time::simple_time_epoch_seconds(u64::from(header.mtime())),
         item_type: ItemType::RegularFile,
         ownership: Ownership::Unknown,
-        xattrs: HashMap::new(),
     })
 }
 
@@ -197,7 +191,6 @@ pub fn tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>) -> 
             }),
             mode: header.mode()?,
         },
-        xattrs: HashMap::new(),
     })
 }
 
@@ -218,6 +211,5 @@ pub fn zip(header: &zip::read::ZipFile) -> Result<Meta> {
         } else {
             Ownership::Unknown
         },
-        xattrs: HashMap::new(),
     })
 }
