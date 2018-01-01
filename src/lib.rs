@@ -32,6 +32,7 @@ mod simple_time;
 mod unpacker;
 
 pub use errors::*;
+pub use unpacker::Entry;
 pub use unpacker::Status;
 
 pub struct Unpack {
@@ -58,7 +59,7 @@ impl Unpack {
     }
 }
 
-pub fn print(entries: &[unpacker::Entry], depth: usize) {
+pub fn print(entries: &[Entry], depth: usize) {
     for entry in entries {
         print!(
             "{} - {:?} at {:?}:",
@@ -67,7 +68,7 @@ pub fn print(entries: &[unpacker::Entry], depth: usize) {
             entry.local.temp
         );
 
-        if let unpacker::Status::Success(ref children) = entry.children {
+        if let Status::Success(ref children) = entry.children {
             println!();
             print(children, depth + 2);
         } else {
