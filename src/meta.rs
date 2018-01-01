@@ -1,5 +1,6 @@
 use std::borrow;
 use std::collections::HashMap;
+use std::path::Path;
 
 use ar;
 use flate2;
@@ -118,6 +119,11 @@ pub fn just_stream() -> Meta {
         ownership: Ownership::Unknown,
         xattrs: HashMap::new(),
     }
+}
+
+pub fn file<P: AsRef<Path>>(file: P) -> Result<Meta> {
+    // TODO
+    Ok(just_stream())
 }
 
 pub fn ar(header: &ar::Header) -> Result<Meta> {

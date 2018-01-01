@@ -2,6 +2,7 @@ error_chain! {
     foreign_links {
         Io(::std::io::Error);
         Utf8(::std::str::Utf8Error);
+        WalkDir(::walkdir::Error);
         Zip(::zip::result::ZipError);
     }
 

@@ -1,6 +1,10 @@
+use std::fs;
 use std::io;
 use std::io::Read;
+use std::path::Path;
 use std::path::PathBuf;
+
+use walkdir;
 
 use meta;
 use errors::*;
@@ -30,6 +34,38 @@ pub enum Status {
     Unsupported(FileType),
     Error(String),
     Success(Vec<Entry>),
+}
+
+pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status> {
+    if !from.as_ref().is_dir() {
+        return Ok(unpack_unknown(mio::Mio::from_path(from)?, temps));
+    }
+
+    let mut entries = Vec::new();
+    for entry in walkdir::WalkDir::new(&from) {
+        let entry = entry?;
+        if entry.file_type().is_dir() {
+            continue;
+        }
+
+        let relative_path = entry
+            .path()
+            .strip_prefix(&from)
+            .expect("dir walking confusion");
+        entries.push(LocalEntry {
+            temp: Some(temps.insert(fs::File::open(entry.path())?)?),
+            meta: meta::file(entry.path())?,
+            path: relative_path
+                .as_os_str()
+                .to_str()
+                .ok_or("unencodable path in local filesystem is unsupported")?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+        }.into_entry(temps))
+    }
+
+    Ok(Status::Success(entries))
 }
 
 pub fn unpack_unknown(mut from: Mio, temps: &mut Temps) -> Status {

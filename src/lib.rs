@@ -16,6 +16,7 @@ extern crate twoway;
 #[macro_use]
 extern crate more_asserts;
 
+extern crate walkdir;
 extern crate xz2;
 extern crate zip;
 
@@ -42,7 +43,7 @@ impl Unpack {
     pub fn unpack_into<P: AsRef<Path>, F: AsRef<Path>>(what: F, root: P) -> Result<Unpack> {
         let mut temps = temps::Temps::new_in(root)?;
         Ok(Unpack {
-            status: unpacker::unpack_unknown(mio::Mio::from_path(what)?, &mut temps),
+            status: unpacker::unpack_root(what, &mut temps)?,
             dir: temps.into_dir(),
         })
     }

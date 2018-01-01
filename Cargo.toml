@@ -9,6 +9,7 @@ more-asserts = "0.1"
 tempdir = "0.3"
 time = "0.1"
 twoway = "0.1"
+walkdir = "2"
 
 #formats
 ar = "0.4"
