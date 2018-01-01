@@ -1,5 +1,6 @@
 use std::borrow;
 use std::collections::HashMap;
+use std::fs;
 use std::path::Path;
 
 use ar;
@@ -121,9 +122,25 @@ pub fn just_stream() -> Meta {
     }
 }
 
-pub fn file<P: AsRef<Path>>(file: P) -> Result<Meta> {
-    // TODO
-    Ok(just_stream())
+pub fn file<P: AsRef<Path>>(path: P) -> Result<Meta> {
+    let meta = path.as_ref().metadata()?;
+
+    let item_type = if meta.is_dir() {
+        unreachable!()
+    } else if meta.file_type().is_symlink() {
+        ItemType::SymbolicLink(fs::read_link(path)?.to_str().ok_or("symlink to invalid utf-8")?.as_bytes().to_vec().into_boxed_slice())
+    } else if meta.is_file() {
+        ItemType::RegularFile
+    } else {
+        ItemType::Unknown
+    };
+
+    Ok(Meta {
+        mtime: simple_time::simple_time_sys(meta.modified()?),
+        item_type,
+        ownership: Ownership::Unknown,
+        xattrs: HashMap::new(),
+    })
 }
 
 pub fn ar(header: &ar::Header) -> Result<Meta> {
