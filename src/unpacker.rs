@@ -184,7 +184,7 @@ where
 fn unpack_bz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use bzip2;
 
-    let decoder = match embedded_tar(from, |mio| bzip2::read::BzDecoder::new(mio), temps)? {
+    let decoder = match embedded_tar(from, bzip2::read::BzDecoder::new, temps)? {
         EmbeddedTar::Found(vec) => return Ok(vec),
         EmbeddedTar::Absent(decoder) => decoder,
     };
@@ -203,7 +203,7 @@ fn unpack_bz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
 fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use flate2;
 
-    let decoder = match embedded_tar(from, |mio| flate2::read::GzDecoder::new(mio), temps)? {
+    let decoder = match embedded_tar(from, flate2::read::GzDecoder::new, temps)? {
         EmbeddedTar::Found(vec) => return Ok(vec),
         EmbeddedTar::Absent(decoder) => decoder,
     };
@@ -227,7 +227,7 @@ fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
 fn unpack_xz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     use xz2;
 
-    let decoder = match embedded_tar(from, |mio| xz2::read::XzDecoder::new(mio), temps)? {
+    let decoder = match embedded_tar(from, xz2::read::XzDecoder::new, temps)? {
         EmbeddedTar::Found(vec) => return Ok(vec),
         EmbeddedTar::Absent(decoder) => decoder,
     };
