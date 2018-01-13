@@ -14,7 +14,6 @@ walkdir = "2"
 #formats
 ar = "0.4"
 bzip2 = "0.3"
-flate2 = "1"
 tar = "0.4"
 xz2 = "0.1.4"
 zip = "0.2"
@@ -22,3 +21,9 @@ zip = "0.2"
 
 [dev-dependencies.error-chain-for-dumb-ides]
 git = "https://github.com/FauxFaux/error-chain-for-dumb-ides"
+
+[dependencies.flate2]
+version = "1"
+default-features = false
+features = ["rust_backend"]
+
