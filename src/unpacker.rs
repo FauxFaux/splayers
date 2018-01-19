@@ -101,7 +101,6 @@ fn unpack_deb(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
         let path = entry
             .header()
             .identifier()
-            .as_bytes()
             .to_vec()
             .into_boxed_slice();
         let meta = meta::ar(entry.header())?;

@@ -12,7 +12,7 @@ twoway = "0.1"
 walkdir = "2"
 
 #formats
-ar = "0.4"
+ar = "0.5"
 bzip2 = "0.3"
 tar = "0.4"
 xz2 = "0.1.4"
