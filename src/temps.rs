@@ -7,6 +7,8 @@ use std::path::PathBuf;
 
 use tempdir::TempDir;
 
+use errors::*;
+
 #[derive(Debug)]
 pub struct Temps {
     dir: TempDir,
@@ -21,7 +23,7 @@ impl Temps {
         })
     }
 
-    pub fn insert<R: Read>(&mut self, mut from: R) -> io::Result<PathBuf> {
+    pub fn insert<R: Read>(&mut self, mut from: R) -> Result<PathBuf> {
         let mut dest = self.dir.as_ref().to_path_buf();
         let three_hex_digits = 4096;
         let subdir = self.count / three_hex_digits;
@@ -37,7 +39,9 @@ impl Temps {
         let mut tmp = fs::OpenOptions::new()
             .create_new(true)
             .write(true)
-            .open(&dest)?;
+            .open(&dest)
+            .chain_err(|| format!("creating {:?}", dest))?;
+
         loop {
             let mut buf = [0u8; 8 * 1024];
             let found = from.read(&mut buf)?;

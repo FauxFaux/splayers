@@ -52,17 +52,27 @@ pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status>
             .path()
             .strip_prefix(&from)
             .expect("dir walking confusion");
-        entries.push(LocalEntry {
-            temp: Some(temps.insert(fs::File::open(entry.path())?)?),
-            meta: meta::file(entry.path())?,
-            path: relative_path
-                .as_os_str()
-                .to_str()
-                .ok_or("unencodable path in local filesystem is unsupported")?
-                .as_bytes()
-                .to_vec()
-                .into_boxed_slice(),
-        }.into_entry(temps))
+
+        let temp = if !entry.path().symlink_metadata()?.file_type().is_symlink() {
+            Some(temps.insert(fs::File::open(entry.path())
+                .chain_err(|| format!("opening input path: {:?}", entry.path()))?)?)
+        } else {
+            None
+        };
+
+        entries.push(
+            LocalEntry {
+                temp,
+                meta: meta::file(entry.path())?,
+                path: relative_path
+                    .as_os_str()
+                    .to_str()
+                    .ok_or("unencodable path in local filesystem is unsupported")?
+                    .as_bytes()
+                    .to_vec()
+                    .into_boxed_slice(),
+            }.into_entry(temps),
+        )
     }
 
     Ok(Status::Success(entries))
@@ -98,11 +108,7 @@ fn unpack_deb(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     while let Some(entry) = decoder.next_entry() {
         let entry = entry?;
         let size = entry.header().size();
-        let path = entry
-            .header()
-            .identifier()
-            .to_vec()
-            .into_boxed_slice();
+        let path = entry.header().identifier().to_vec().into_boxed_slice();
         let meta = meta::ar(entry.header())?;
 
         entries.push(LocalEntry {
@@ -242,11 +248,7 @@ fn unpack_xz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     ])
 }
 
-fn insert_if_non_empty<R: Read>(
-    temps: &mut Temps,
-    from: R,
-    size: u64,
-) -> io::Result<Option<PathBuf>> {
+fn insert_if_non_empty<R: Read>(temps: &mut Temps, from: R, size: u64) -> Result<Option<PathBuf>> {
     Ok(if 0 == size {
         None
     } else {

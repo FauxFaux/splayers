@@ -120,12 +120,19 @@ pub fn just_stream() -> Meta {
 }
 
 pub fn file<P: AsRef<Path>>(path: P) -> Result<Meta> {
-    let meta = path.as_ref().metadata()?;
+    let meta = path.as_ref().symlink_metadata()?;
 
     let item_type = if meta.is_dir() {
         unreachable!()
     } else if meta.file_type().is_symlink() {
-        ItemType::SymbolicLink(fs::read_link(path)?.to_str().ok_or("symlink to invalid utf-8")?.as_bytes().to_vec().into_boxed_slice())
+        ItemType::SymbolicLink(
+            fs::read_link(path)?
+                .to_str()
+                .ok_or("symlink to invalid utf-8")?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+        )
     } else if meta.is_file() {
         ItemType::RegularFile
     } else {
