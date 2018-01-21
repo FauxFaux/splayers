@@ -27,3 +27,6 @@ version = "1"
 default-features = false
 features = ["rust_backend"]
 
+[dependencies.miniz_oxide]
+git = "https://github.com/Frommi/miniz_oxide"
+rev = "901424d45067033af1f56701f98ea9bce6d155e7"
