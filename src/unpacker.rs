@@ -31,6 +31,7 @@ pub struct LocalEntry {
 pub enum Status {
     Unnecessary,
     Unrecognised,
+    TooNested,
     Unsupported(FileType),
     Error(String),
     Success(Vec<Entry>),
@@ -38,7 +39,7 @@ pub enum Status {
 
 pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status> {
     if !from.as_ref().is_dir() {
-        return Ok(unpack_unknown(mio::Mio::from_path(from)?, temps));
+        return Ok(unpack_unknown(mio::Mio::from_path(from)?, temps, 0));
     }
 
     let mut entries = Vec::new();
@@ -71,14 +72,18 @@ pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status>
                     .as_bytes()
                     .to_vec()
                     .into_boxed_slice(),
-            }.into_entry(temps),
+            }.into_entry(temps, 0),
         )
     }
 
     Ok(Status::Success(entries))
 }
 
-pub fn unpack_unknown(mut from: Mio, temps: &mut Temps) -> Status {
+pub fn unpack_unknown(mut from: Mio, temps: &mut Temps, depth: u16) -> Status {
+    if depth >= 128 {
+        return Status::TooNested;
+    }
+
     match match FileType::identify(&from.header()) {
         FileType::Deb => unpack_deb(from, temps),
         FileType::Tar => unpack_tar(from, temps),
@@ -92,7 +97,7 @@ pub fn unpack_unknown(mut from: Mio, temps: &mut Temps) -> Status {
     } {
         Ok(kids) => Status::Success(
             kids.into_iter()
-                .map(|local| local.into_entry(temps))
+                .map(|local| local.into_entry(temps, depth))
                 .collect(),
         ),
         Err(e) => Status::Error(format!("{}", e)),
@@ -257,9 +262,9 @@ fn insert_if_non_empty<R: Read>(temps: &mut Temps, from: R, size: u64) -> Result
 }
 
 impl LocalEntry {
-    fn into_entry(mut self, temps: &mut Temps) -> Entry {
+    fn into_entry(mut self, temps: &mut Temps, depth: u16) -> Entry {
         let children = if let Some(temp) = self.temp.as_ref() {
-            unpack_unknown(Mio::from_path(temp).expect("working with temps"), temps)
+            unpack_unknown(Mio::from_path(temp).expect("working with temps"), temps, depth + 1)
         } else {
             Status::Unnecessary
         };
