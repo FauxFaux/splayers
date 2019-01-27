@@ -144,7 +144,7 @@ fn unpack_tar<R: Read>(from: R, temps: &mut Temps) -> Result<Vec<LocalEntry>, Er
         let tar = tar?;
         let size = tar.header().size()?;
         let path = tar.path_bytes().to_vec().into_boxed_slice();
-        let mut meta = meta::for_tar(tar.header(), tar.link_name_bytes())?;
+        let meta = meta::for_tar(tar.header(), tar.link_name_bytes())?;
 
         entries.push(LocalEntry {
             meta,

@@ -59,7 +59,7 @@ pub enum Ownership {
 
 #[derive(Clone, Debug)]
 pub struct PosixEntity {
-    pub id: u32,
+    pub id: u64,
     pub name: String,
 }
 
@@ -104,7 +104,7 @@ impl RawItemType {
 }
 
 impl PosixEntity {
-    fn just_id(id: u32) -> PosixEntity {
+    fn just_id(id: u64) -> PosixEntity {
         PosixEntity {
             id,
             name: String::new(),
@@ -152,8 +152,8 @@ pub fn for_ar(header: &ar::Header) -> Result<Meta, Error> {
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()),
         item_type: ItemType::from_mode_lossy(header.mode()),
         ownership: Ownership::Posix {
-            user: Some(PosixEntity::just_id(header.uid())),
-            group: Some(PosixEntity::just_id(header.gid())),
+            user: Some(PosixEntity::just_id(u64::from(header.uid()))),
+            group: Some(PosixEntity::just_id(u64::from(header.gid()))),
             mode: header.mode(),
         },
     })
@@ -215,7 +215,7 @@ pub fn for_tar(
 
 pub fn for_zip(header: &zip::read::ZipFile) -> Result<Meta, Error> {
     Ok(Meta {
-        mtime: simple_time::simple_time_tm(header.last_modified()),
+        mtime: simple_time::simple_time_tm(header.last_modified().to_time()),
         item_type: if header.name_raw().ends_with(b"/") {
             ItemType::Directory
         } else {

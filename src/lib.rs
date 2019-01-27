@@ -1,21 +1,10 @@
-extern crate ar;
-extern crate bzip2;
-
 #[macro_use]
 extern crate failure;
 
-extern crate flate2;
-extern crate tar;
-extern crate tempdir;
 extern crate time as crates_time;
-extern crate twoway;
 
 #[macro_use]
 extern crate more_asserts;
-
-extern crate walkdir;
-extern crate xz2;
-extern crate zip;
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -34,7 +23,7 @@ pub use crate::unpacker::Status;
 
 pub struct Unpack {
     status: Status,
-    dir: tempdir::TempDir,
+    dir: tempfile::TempDir,
 }
 
 impl Unpack {

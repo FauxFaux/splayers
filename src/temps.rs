@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use failure::Error;
 use failure::ResultExt;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 #[derive(Debug)]
 pub struct Temps {
@@ -18,7 +18,7 @@ pub struct Temps {
 impl Temps {
     pub fn new_in<P: AsRef<Path>>(inside: P) -> io::Result<Self> {
         Ok(Temps {
-            dir: TempDir::new_in(inside, ".splayers")?,
+            dir: TempDir::new_in(inside)?,
             count: 0,
         })
     }
