@@ -18,6 +18,7 @@ mod simple_time;
 mod temps;
 mod unpacker;
 
+pub use crate::meta::ItemType;
 pub use crate::unpacker::Entry;
 pub use crate::unpacker::Status;
 
