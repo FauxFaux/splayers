@@ -48,8 +48,12 @@ pub fn is_probably_tar(header: &[u8]) -> bool {
         return false;
     }
 
-    if header.len() > 257 + 10 && b'u' == header[257] && b's' == header[258] && b't' == header[259]
-        && b'a' == header[260] && b'r' == header[261]
+    if header.len() > 257 + 10
+        && b'u' == header[257]
+        && b's' == header[258]
+        && b't' == header[259]
+        && b'a' == header[260]
+        && b'r' == header[261]
         && ((0 == header[262] && b'0' == header[263] && b'0' == header[264])
             || (b' ' == header[262] && b' ' == header[263] && 0 == header[264]))
     {
@@ -60,7 +64,8 @@ pub fn is_probably_tar(header: &[u8]) -> bool {
         let found: u32 = header[0..148]
             .into_iter()
             .map(|&x| u32::from(x))
-            .sum::<u32>() + u32::from(b' ') * 8
+            .sum::<u32>()
+            + u32::from(b' ') * 8
             + header[156..512]
                 .into_iter()
                 .map(|&x| u32::from(x))
@@ -118,7 +123,9 @@ impl FileType {
 
 fn source(header: &[u8]) -> bool {
     // Unix script shebang with absolute path.
-    if header.len() > 16 && b'#' == header[0] && b'!' == header[1]
+    if header.len() > 16
+        && b'#' == header[0]
+        && b'!' == header[1]
         && (b'/' == header[2] || b'/' == header[3])
     {
         return true;
@@ -130,7 +137,8 @@ fn source(header: &[u8]) -> bool {
     }
 
     // XML or HTML
-    if header.len() > 16 && b'<' == header[0]
+    if header.len() > 16
+        && b'<' == header[0]
         && (b'?' == header[1] || b'h' == header[1] || b'H' == header[1] || b'!' == header[1])
     {
         return true;
@@ -147,7 +155,8 @@ fn source(header: &[u8]) -> bool {
     }
 
     // Java
-    if header.starts_with(b"import ") || header.starts_with(b"package ")
+    if header.starts_with(b"import ")
+        || header.starts_with(b"package ")
         || header.starts_with(b"public class ")
     {
         return true;

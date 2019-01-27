@@ -6,13 +6,13 @@ use std::path::PathBuf;
 
 use walkdir;
 
-use meta;
-use errors::*;
-use file_type;
-use file_type::FileType;
-use mio;
-use mio::Mio;
-use temps::Temps;
+use crate::errors::*;
+use crate::file_type;
+use crate::file_type::FileType;
+use crate::meta;
+use crate::mio;
+use crate::mio::Mio;
+use crate::temps::Temps;
 
 #[derive(Debug)]
 pub struct Entry {
@@ -55,8 +55,12 @@ pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status>
             .expect("dir walking confusion");
 
         let temp = if !entry.path().symlink_metadata()?.file_type().is_symlink() {
-            Some(temps.insert(fs::File::open(entry.path())
-                .chain_err(|| format!("opening input path: {:?}", entry.path()))?)?)
+            Some(
+                temps.insert(
+                    fs::File::open(entry.path())
+                        .chain_err(|| format!("opening input path: {:?}", entry.path()))?,
+                )?,
+            )
         } else {
             None
         };
@@ -72,7 +76,8 @@ pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status>
                     .as_bytes()
                     .to_vec()
                     .into_boxed_slice(),
-            }.into_entry(temps, 0),
+            }
+            .into_entry(temps, 0),
         )
     }
 
@@ -114,7 +119,7 @@ fn unpack_deb(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
         let entry = entry?;
         let size = entry.header().size();
         let path = entry.header().identifier().to_vec().into_boxed_slice();
-        let meta = meta::ar(entry.header())?;
+        let meta = meta::for_ar(entry.header())?;
 
         entries.push(LocalEntry {
             meta,
@@ -135,7 +140,7 @@ fn unpack_tar<R: Read>(from: R, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
         let tar = tar?;
         let size = tar.header().size()?;
         let path = tar.path_bytes().to_vec().into_boxed_slice();
-        let mut meta = meta::tar(tar.header(), tar.link_name_bytes())?;
+        let mut meta = meta::for_tar(tar.header(), tar.link_name_bytes())?;
 
         entries.push(LocalEntry {
             meta,
@@ -158,7 +163,7 @@ fn unpack_zip(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
 
         let size = entry.size();
         let path = entry.name_raw().to_vec().into_boxed_slice();
-        let meta = meta::zip(&entry)?;
+        let meta = meta::for_zip(&entry)?;
 
         entries.push(LocalEntry {
             meta,
@@ -201,13 +206,11 @@ fn unpack_bz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
 
     let temp = Some(temps.insert(decoder)?);
 
-    Ok(vec![
-        LocalEntry {
-            temp,
-            meta: meta::just_stream(),
-            path: b"..bz2".to_vec().into_boxed_slice(),
-        },
-    ])
+    Ok(vec![LocalEntry {
+        temp,
+        meta: meta::just_stream(),
+        path: b"..bz2".to_vec().into_boxed_slice(),
+    }])
 }
 
 fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
@@ -221,17 +224,15 @@ fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     let header = decoder.get_ref().header().ok_or("invalid header")?.clone();
     let temp = Some(temps.insert(decoder)?);
 
-    Ok(vec![
-        LocalEntry {
-            temp,
-            meta: meta::gz(&header)?,
-            path: header
-                .filename()
-                .unwrap_or(b"..gz")
-                .to_vec()
-                .into_boxed_slice(),
-        },
-    ])
+    Ok(vec![LocalEntry {
+        temp,
+        meta: meta::gz(&header)?,
+        path: header
+            .filename()
+            .unwrap_or(b"..gz")
+            .to_vec()
+            .into_boxed_slice(),
+    }])
 }
 
 fn unpack_xz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
@@ -244,13 +245,11 @@ fn unpack_xz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
 
     let temp = Some(temps.insert(decoder)?);
 
-    Ok(vec![
-        LocalEntry {
-            temp,
-            meta: meta::just_stream(),
-            path: b"..xz".to_vec().into_boxed_slice(),
-        },
-    ])
+    Ok(vec![LocalEntry {
+        temp,
+        meta: meta::just_stream(),
+        path: b"..xz".to_vec().into_boxed_slice(),
+    }])
 }
 
 fn insert_if_non_empty<R: Read>(temps: &mut Temps, from: R, size: u64) -> Result<Option<PathBuf>> {
@@ -264,7 +263,11 @@ fn insert_if_non_empty<R: Read>(temps: &mut Temps, from: R, size: u64) -> Result
 impl LocalEntry {
     fn into_entry(mut self, temps: &mut Temps, depth: u16) -> Entry {
         let children = if let Some(temp) = self.temp.as_ref() {
-            unpack_unknown(Mio::from_path(temp).expect("working with temps"), temps, depth + 1)
+            unpack_unknown(
+                Mio::from_path(temp).expect("working with temps"),
+                temps,
+                depth + 1,
+            )
         } else {
             Status::Unnecessary
         };

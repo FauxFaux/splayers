@@ -24,16 +24,16 @@ use std::path::Path;
 use std::path::PathBuf;
 
 mod errors;
-mod temps;
 mod file_type;
 mod meta;
 mod mio;
 mod simple_time;
+mod temps;
 mod unpacker;
 
-pub use errors::*;
-pub use unpacker::Entry;
-pub use unpacker::Status;
+pub use crate::errors::*;
+pub use crate::unpacker::Entry;
+pub use crate::unpacker::Status;
 
 pub struct Unpack {
     status: Status,

@@ -1,10 +1,10 @@
+use std::fs;
 use std::io;
 use std::io::BufRead;
-use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use errors::*;
+use crate::errors::*;
 
 /// Same as `io::DEFAULT_BUF_SIZE`.
 const CAP: usize = 8 * 1024;
@@ -51,11 +51,13 @@ impl io::Read for Mio {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.inner.read(buf) {
             Ok(len) => Ok(len),
-            Err(e) => if e.kind() == io::ErrorKind::UnexpectedEof {
-                Err(e)
-            } else {
-                panic!("unexpected io error from filesystem: {:?}", e)
-            },
+            Err(e) => {
+                if e.kind() == io::ErrorKind::UnexpectedEof {
+                    Err(e)
+                } else {
+                    panic!("unexpected io error from filesystem: {:?}", e)
+                }
+            }
         }
     }
 }

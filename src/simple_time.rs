@@ -1,6 +1,6 @@
 use std::time;
 
-use crates_time;
+use crate::crates_time;
 
 pub fn simple_time(dur: time::Duration) -> u64 {
     dur.as_secs()

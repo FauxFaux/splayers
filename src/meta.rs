@@ -7,8 +7,8 @@ use flate2;
 use tar;
 use zip;
 
-use errors::*;
-use simple_time;
+use crate::errors::*;
+use crate::simple_time;
 
 #[derive(Clone, Debug)]
 pub struct Meta {
@@ -146,7 +146,7 @@ pub fn file<P: AsRef<Path>>(path: P) -> Result<Meta> {
     })
 }
 
-pub fn ar(header: &ar::Header) -> Result<Meta> {
+pub fn for_ar(header: &ar::Header) -> Result<Meta> {
     Ok(Meta {
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()),
         item_type: ItemType::from_mode_lossy(header.mode()),
@@ -166,7 +166,7 @@ pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
     })
 }
 
-pub fn tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>) -> Result<Meta> {
+pub fn for_tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>) -> Result<Meta> {
     let mode = header.mode()?;
     Ok(Meta {
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()?),
@@ -201,7 +201,7 @@ pub fn tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>) -> 
     })
 }
 
-pub fn zip(header: &zip::read::ZipFile) -> Result<Meta> {
+pub fn for_zip(header: &zip::read::ZipFile) -> Result<Meta> {
     Ok(Meta {
         mtime: simple_time::simple_time_tm(header.last_modified()),
         item_type: if header.name_raw().ends_with(b"/") {

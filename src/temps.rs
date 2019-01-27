@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use tempdir::TempDir;
 
-use errors::*;
+use crate::errors::*;
 
 #[derive(Debug)]
 pub struct Temps {
