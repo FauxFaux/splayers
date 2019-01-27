@@ -5,9 +5,9 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+use failure::Error;
+use failure::ResultExt;
 use tempdir::TempDir;
-
-use crate::errors::*;
 
 #[derive(Debug)]
 pub struct Temps {
@@ -23,7 +23,7 @@ impl Temps {
         })
     }
 
-    pub fn insert<R: Read>(&mut self, mut from: R) -> Result<PathBuf> {
+    pub fn insert<R: Read>(&mut self, mut from: R) -> Result<PathBuf, Error> {
         let mut dest = self.dir.as_ref().to_path_buf();
         let three_hex_digits = 4096;
         let subdir = self.count / three_hex_digits;
@@ -40,7 +40,7 @@ impl Temps {
             .create_new(true)
             .write(true)
             .open(&dest)
-            .chain_err(|| format!("creating {:?}", dest))?;
+            .with_context(|_| format_err!("creating {:?}", dest))?;
 
         loop {
             let mut buf = [0u8; 8 * 1024];

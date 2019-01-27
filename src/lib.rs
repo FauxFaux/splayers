@@ -2,10 +2,7 @@ extern crate ar;
 extern crate bzip2;
 
 #[macro_use]
-extern crate error_chain;
-
-#[cfg(intellij_type_hinting)]
-extern crate error_chain_for_dumb_ides;
+extern crate failure;
 
 extern crate flate2;
 extern crate tar;
@@ -23,7 +20,8 @@ extern crate zip;
 use std::path::Path;
 use std::path::PathBuf;
 
-mod errors;
+use failure::Error;
+
 mod file_type;
 mod meta;
 mod mio;
@@ -31,7 +29,6 @@ mod simple_time;
 mod temps;
 mod unpacker;
 
-pub use crate::errors::*;
 pub use crate::unpacker::Entry;
 pub use crate::unpacker::Status;
 
@@ -41,7 +38,7 @@ pub struct Unpack {
 }
 
 impl Unpack {
-    pub fn unpack_into<P: AsRef<Path>, F: AsRef<Path>>(what: F, root: P) -> Result<Unpack> {
+    pub fn unpack_into<P: AsRef<Path>, F: AsRef<Path>>(what: F, root: P) -> Result<Unpack, Error> {
         let mut temps = temps::Temps::new_in(root)?;
         Ok(Unpack {
             status: unpacker::unpack_root(what, &mut temps)?,

@@ -4,7 +4,7 @@ use std::io::BufRead;
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::errors::*;
+use failure::Error;
 
 /// Same as `io::DEFAULT_BUF_SIZE`.
 const CAP: usize = 8 * 1024;
@@ -16,7 +16,7 @@ pub struct Mio {
 }
 
 impl Mio {
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Mio> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Mio, Error> {
         Ok(Mio {
             path: path.as_ref().to_path_buf(),
             inner: io::BufReader::with_capacity(CAP, fs::File::open(path)?),

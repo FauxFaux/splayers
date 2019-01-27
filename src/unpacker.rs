@@ -4,9 +4,11 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
+use failure::err_msg;
+use failure::Error;
+use failure::ResultExt;
 use walkdir;
 
-use crate::errors::*;
 use crate::file_type;
 use crate::file_type::FileType;
 use crate::meta;
@@ -37,7 +39,7 @@ pub enum Status {
     Success(Vec<Entry>),
 }
 
-pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status> {
+pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status, Error> {
     if !from.as_ref().is_dir() {
         return Ok(unpack_unknown(mio::Mio::from_path(from)?, temps, 0));
     }
@@ -56,10 +58,10 @@ pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status>
 
         let temp = if !entry.path().symlink_metadata()?.file_type().is_symlink() {
             Some(
-                temps.insert(
-                    fs::File::open(entry.path())
-                        .chain_err(|| format!("opening input path: {:?}", entry.path()))?,
-                )?,
+                temps
+                    .insert(fs::File::open(entry.path()).with_context(|_| {
+                        format_err!("opening input path: {:?}", entry.path())
+                    })?)?,
             )
         } else {
             None
@@ -72,7 +74,9 @@ pub fn unpack_root<P: AsRef<Path>>(from: P, temps: &mut Temps) -> Result<Status>
                 path: relative_path
                     .as_os_str()
                     .to_str()
-                    .ok_or("unencodable path in local filesystem is unsupported")?
+                    .ok_or(err_msg(
+                        "unencodable path in local filesystem is unsupported",
+                    ))?
                     .as_bytes()
                     .to_vec()
                     .into_boxed_slice(),
@@ -109,7 +113,7 @@ pub fn unpack_unknown(mut from: Mio, temps: &mut Temps, depth: u16) -> Status {
     }
 }
 
-fn unpack_deb(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_deb(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>, Error> {
     use ar;
 
     let mut entries = Vec::new();
@@ -131,7 +135,7 @@ fn unpack_deb(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     Ok(entries)
 }
 
-fn unpack_tar<R: Read>(from: R, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_tar<R: Read>(from: R, temps: &mut Temps) -> Result<Vec<LocalEntry>, Error> {
     use tar;
 
     let mut entries = Vec::new();
@@ -152,7 +156,7 @@ fn unpack_tar<R: Read>(from: R, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     Ok(entries)
 }
 
-fn unpack_zip(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_zip(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>, Error> {
     use zip;
 
     let mut entries = Vec::new();
@@ -180,7 +184,7 @@ enum EmbeddedTar<T> {
     Absent(io::BufReader<T>),
 }
 
-fn embedded_tar<F, T: Read>(from: Mio, make: F, temps: &mut Temps) -> Result<EmbeddedTar<T>>
+fn embedded_tar<F, T: Read>(from: Mio, make: F, temps: &mut Temps) -> Result<EmbeddedTar<T>, Error>
 where
     F: Fn(Mio) -> T,
 {
@@ -196,7 +200,7 @@ where
     })
 }
 
-fn unpack_bz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_bz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>, Error> {
     use bzip2;
 
     let decoder = match embedded_tar(from, bzip2::read::BzDecoder::new, temps)? {
@@ -213,7 +217,7 @@ fn unpack_bz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     }])
 }
 
-fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>, Error> {
     use flate2;
 
     let decoder = match embedded_tar(from, flate2::read::GzDecoder::new, temps)? {
@@ -221,7 +225,11 @@ fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
         EmbeddedTar::Absent(decoder) => decoder,
     };
 
-    let header = decoder.get_ref().header().ok_or("invalid header")?.clone();
+    let header = decoder
+        .get_ref()
+        .header()
+        .ok_or(err_msg("invalid header"))?
+        .clone();
     let temp = Some(temps.insert(decoder)?);
 
     Ok(vec![LocalEntry {
@@ -235,7 +243,7 @@ fn unpack_gz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     }])
 }
 
-fn unpack_xz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
+fn unpack_xz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>, Error> {
     use xz2;
 
     let decoder = match embedded_tar(from, xz2::read::XzDecoder::new, temps)? {
@@ -252,7 +260,11 @@ fn unpack_xz(from: Mio, temps: &mut Temps) -> Result<Vec<LocalEntry>> {
     }])
 }
 
-fn insert_if_non_empty<R: Read>(temps: &mut Temps, from: R, size: u64) -> Result<Option<PathBuf>> {
+fn insert_if_non_empty<R: Read>(
+    temps: &mut Temps,
+    from: R,
+    size: u64,
+) -> Result<Option<PathBuf>, Error> {
     Ok(if 0 == size {
         None
     } else {

@@ -3,11 +3,12 @@ use std::fs;
 use std::path::Path;
 
 use ar;
+use failure::err_msg;
+use failure::Error;
 use flate2;
 use tar;
 use zip;
 
-use crate::errors::*;
 use crate::simple_time;
 
 #[derive(Clone, Debug)]
@@ -119,7 +120,7 @@ pub fn just_stream() -> Meta {
     }
 }
 
-pub fn file<P: AsRef<Path>>(path: P) -> Result<Meta> {
+pub fn file<P: AsRef<Path>>(path: P) -> Result<Meta, Error> {
     let meta = path.as_ref().symlink_metadata()?;
 
     let item_type = if meta.is_dir() {
@@ -128,7 +129,7 @@ pub fn file<P: AsRef<Path>>(path: P) -> Result<Meta> {
         ItemType::SymbolicLink(
             fs::read_link(path)?
                 .to_str()
-                .ok_or("symlink to invalid utf-8")?
+                .ok_or(err_msg("symlink to invalid utf-8"))?
                 .as_bytes()
                 .to_vec()
                 .into_boxed_slice(),
@@ -146,7 +147,7 @@ pub fn file<P: AsRef<Path>>(path: P) -> Result<Meta> {
     })
 }
 
-pub fn for_ar(header: &ar::Header) -> Result<Meta> {
+pub fn for_ar(header: &ar::Header) -> Result<Meta, Error> {
     Ok(Meta {
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()),
         item_type: ItemType::from_mode_lossy(header.mode()),
@@ -158,7 +159,7 @@ pub fn for_ar(header: &ar::Header) -> Result<Meta> {
     })
 }
 
-pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
+pub fn gz(header: &flate2::GzHeader) -> Result<Meta, Error> {
     Ok(Meta {
         mtime: simple_time::simple_time_epoch_seconds(u64::from(header.mtime())),
         item_type: ItemType::RegularFile,
@@ -166,24 +167,35 @@ pub fn gz(header: &flate2::GzHeader) -> Result<Meta> {
     })
 }
 
-pub fn for_tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>) -> Result<Meta> {
+pub fn for_tar(
+    header: &tar::Header,
+    link_name_bytes: Option<borrow::Cow<[u8]>>,
+) -> Result<Meta, Error> {
     let mode = header.mode()?;
     Ok(Meta {
         mtime: simple_time::simple_time_epoch_seconds(header.mtime()?),
         item_type: match RawItemType::from_mode_lossy(mode) {
             RawItemType::SymbolicLink => ItemType::SymbolicLink(
                 link_name_bytes
-                    .ok_or("symbolic-link style file with no link")?
+                    .ok_or(err_msg("symbolic-link style file with no link"))?
                     .to_vec()
                     .into_boxed_slice(),
             ),
             RawItemType::CharacterDevice => ItemType::CharacterDevice {
-                major: header.device_major()?.ok_or("char device without major")?,
-                minor: header.device_minor()?.ok_or("char device without minor")?,
+                major: header
+                    .device_major()?
+                    .ok_or(err_msg("char device without major"))?,
+                minor: header
+                    .device_minor()?
+                    .ok_or(err_msg("char device without minor"))?,
             },
             RawItemType::BlockDevice => ItemType::BlockDevice {
-                major: header.device_major()?.ok_or("block device without major")?,
-                minor: header.device_minor()?.ok_or("block device without minor")?,
+                major: header
+                    .device_major()?
+                    .ok_or(err_msg("block device without major"))?,
+                minor: header
+                    .device_minor()?
+                    .ok_or(err_msg("block device without minor"))?,
             },
             RawItemType::Sloppy => ItemType::from_mode_lossy(mode),
         },
@@ -201,7 +213,7 @@ pub fn for_tar(header: &tar::Header, link_name_bytes: Option<borrow::Cow<[u8]>>)
     })
 }
 
-pub fn for_zip(header: &zip::read::ZipFile) -> Result<Meta> {
+pub fn for_zip(header: &zip::read::ZipFile) -> Result<Meta, Error> {
     Ok(Meta {
         mtime: simple_time::simple_time_tm(header.last_modified()),
         item_type: if header.name_raw().ends_with(b"/") {
