@@ -173,7 +173,7 @@ pub fn for_tar(
 ) -> Result<Meta, Error> {
     let mode = header.mode()?;
     Ok(Meta {
-        mtime: simple_time::simple_time_epoch_seconds(header.mtime()?),
+        mtime: simple_time::simple_time_epoch_seconds(header.mtime().unwrap_or(0)),
         item_type: match RawItemType::from_mode_lossy(mode) {
             RawItemType::SymbolicLink => ItemType::SymbolicLink(
                 link_name_bytes
