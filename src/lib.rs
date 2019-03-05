@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use failure::Error;
 
 mod file_type;
+mod fill_read;
 mod meta;
 mod mio;
 mod simple_time;
